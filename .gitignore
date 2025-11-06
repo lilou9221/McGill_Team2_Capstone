@@ -65,6 +65,12 @@ configs/settings.yaml
 temp_*/
 tmp_*/
 
+# Test files (except Step 14 tests in tests/ directory)
+test_*.py
+*_test.csv
+*_test.json
+!tests/**/*.py
+
 # HTML files (except output maps)
 *.html
 !output/html/*.html
