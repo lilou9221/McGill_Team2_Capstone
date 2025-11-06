@@ -65,6 +65,10 @@ configs/settings.yaml
 temp_*/
 tmp_*/
 
+# HTML files (except output maps)
+*.html
+!output/html/*.html
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
