@@ -102,12 +102,48 @@ with st.sidebar:
 if run_btn:
     with st.spinner("Initializing..."):
         tmp_raw = Path(tempfile.mkdtemp(prefix="rc_raw_"))
-        src_raw = PROJECT_ROOT / config["data"]["raw"]
-        if src_raw.exists():
-            shutil.copytree(src_raw, tmp_raw, dirs_exist_ok=True)
+                from pydrive2.auth import GoogleAuth
+        from pydrive2.drive import GoogleDrive
+        import os
+
+        raw_dir = PROJECT_ROOT / config["data"]["raw"]
+        raw_dir.mkdir(parents=True, exist_ok=True)
+
+        # If files exist locally → use them
+        if raw_dir.exists() and len(list(raw_dir.glob("*.tif"))) >= 5:
+            st.info("Using cached GeoTIFFs")
+            shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
         else:
-            st.error("Raw GeoTIFFs missing.")
-            st.stop()
+            st.warning("GeoTIFFs not found. Downloading from Google Drive...")
+            try:
+                # Authenticate
+                gauth = GoogleAuth()
+                gauth.LoadCredentialsFile(PROJECT_ROOT / config["drive"]["credentials_file"])
+                if gauth.credentials is None:
+                    st.error("Google Drive credentials missing. Add `credentials.json` as a secret.")
+                    st.stop()
+                gauth.Authorize()
+                drive = GoogleDrive(gauth)
+
+                # List files in folder
+                folder_id = config["drive"]["raw_data_folder_id"]
+                file_list = drive.ListFile({'q': f"'{folder_id}' in parents and trashed=false"}).GetList()
+
+                for file in file_list:
+                    if file['title'].endswith('.tif'):
+                        filepath = raw_dir / file['title']
+                        if not filepath.exists():
+                            with st.spinner(f"Downloading {file['title']}..."):
+                                file.GetContentFile(str(filepath))
+                        else:
+                            st.info(f"{file['title']} already downloaded")
+
+                st.success("All GeoTIFFs downloaded!")
+                shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
+
+            except Exception as e:
+                st.error(f"Drive download failed: {e}")
+                st.stop()
 
         cli = [
             "python", str(PROJECT_ROOT / "src" / "main.py"),
