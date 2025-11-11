@@ -40,3 +40,7 @@ python-dotenv>=1.0.0
 # Web browser automation (for auto-opening HTML)
 webbrowser  # Built-in Python module
 
+# Streamlit UI
+streamlit>=1.38.0
+streamlit-folium>=0.15.0          # optional, if you want a fallback Folium map
+
