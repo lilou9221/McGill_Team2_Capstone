@@ -7,6 +7,9 @@ import yaml
 import subprocess
 import shutil
 import tempfile
+import os
+import json
+import io
 
 # Project setup
 PROJECT_ROOT = Path(__file__).parent.resolve()
@@ -100,11 +103,6 @@ with st.sidebar:
 if run_btn:
     with st.spinner("Initializing..."):
         tmp_raw = Path(tempfile.mkdtemp(prefix="rc_raw_"))
-
-
-        import os
-        import json
-
         raw_dir = PROJECT_ROOT / config["data"]["raw"]
         raw_dir.mkdir(parents=True, exist_ok=True)
 
@@ -112,13 +110,12 @@ if run_btn:
         if raw_dir.exists() and len(list(raw_dir.glob("*.tif"))) >= 5:
             st.info("Using cached GeoTIFFs")
             shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
-                else:
+        else:
             st.warning("GeoTIFFs not found. Downloading from Google Drive...")
             try:
                 from google.oauth2 import service_account
                 from googleapiclient.discovery import build
                 from googleapiclient.http import MediaIoBaseDownload
-                import io
 
                 # Load credentials from Streamlit Secrets
                 creds_info = json.loads(st.secrets["google_drive"]["credentials"])
@@ -138,7 +135,6 @@ if run_btn:
                     fields="files(id, name)"
                 ).execute()
                 files = results.get('files', [])
-
                 tif_files = [f for f in files if f['name'].endswith('.tif')]
 
                 if not tif_files:
@@ -160,29 +156,6 @@ if run_btn:
                                 f.write(fh.read())
                     else:
                         st.info(f"{file['name']} already downloaded")
-
-                st.success("All GeoTIFFs downloaded!")
-                shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
-
-            except Exception as e:
-                st.error(f"Drive download failed: {e}")
-                st.stop()
-
-                gauth.Authorize()
-                drive = GoogleDrive(gauth)
-
-                # List files in folder
-                folder_id = config["drive"]["raw_data_folder_id"]
-                file_list = drive.ListFile({'q': f"'{folder_id}' in parents and trashed=false"}).GetList()
-
-                for file in file_list:
-                    if file['title'].endswith('.tif'):
-                        filepath = raw_dir / file['title']
-                        if not filepath.exists():
-                            with st.spinner(f"Downloading {file['title']}..."):
-                                file.GetContentFile(str(filepath))
-                        else:
-                            st.info(f"{file['title']} already downloaded")
 
                 st.success("All GeoTIFFs downloaded!")
                 shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
