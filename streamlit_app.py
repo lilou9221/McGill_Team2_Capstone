@@ -8,15 +8,11 @@ import subprocess
 import shutil
 import tempfile
 
-# --------------------------------------------------------------
-# 1. Project setup
-# --------------------------------------------------------------
+# Project setup
 PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# --------------------------------------------------------------
-# 2. Load config
-# --------------------------------------------------------------
+# Load config
 @st.cache_data
 def load_config():
     cfg_path = PROJECT_ROOT / "configs" / "config.yaml"
@@ -25,9 +21,7 @@ def load_config():
 
 config = load_config()
 
-# --------------------------------------------------------------
-# 3. Page config & custom CSS
-# --------------------------------------------------------------
+# Page config
 st.set_page_config(
     page_title="Biochar Suitability Mapper",
     page_icon="leaf",
@@ -35,7 +29,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Inject custom CSS
+# Custom CSS
 st.markdown("""
 <style>
     .main > div {padding-top: 2rem;}
@@ -72,7 +66,6 @@ st.markdown("""
         font-size: 1.1rem;
         margin-bottom: 2rem;
     }
-    .sidebar .css-1d391kg {padding-top: 1.5rem;}
     .footer {
         text-align: center;
         padding: 2rem 0;
@@ -84,15 +77,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --------------------------------------------------------------
-# 4. Header
-# --------------------------------------------------------------
+# Header
 st.markdown('<div class="header-title">Biochar Suitability Mapper</div>', unsafe_allow_html=True)
 st.markdown('<div class="header-subtitle">Precision mapping for sustainable biochar application in Mato Grosso, Brazil</div>', unsafe_allow_html=True)
 
-# --------------------------------------------------------------
-# 5. Sidebar
-# --------------------------------------------------------------
+# Sidebar
 with st.sidebar:
     st.markdown("### Analysis Scope")
     use_coords = st.checkbox("Analyze 100 km radius around a point", value=False)
@@ -100,27 +89,24 @@ with st.sidebar:
     lat = lon = None
     if use_coords:
         col1, col2 = st.columns(2)
-        lat = col1.number_input("Latitude", value=-13.0, step=0.1, format="%.4f", key="lat_input")
-        lon = col2.number_input("Longitude", value=-56.0, step=0.1, format="%.4f", key="lon_input")
+        lat = col1.number_input("Latitude", value=-13.0, step=0.1, format="%.4f")
+        lon = col2.number_input("Longitude", value=-56.0, step=0.1, format="%.4f")
         st.info("Fixed radius: **100 km**")
     else:
         st.info("Full **Mato Grosso state** analysis")
 
-    h3_res = st.slider("H3 resolution", 5, 9, config["processing"].get("h3_resolution", 7), help="Higher = finer hexagons")
-
+    h3_res = st.slider("H3 resolution", 5, 9, config["processing"].get("h3_resolution", 7))
     run_btn = st.button("Run Analysis", type="primary", use_container_width=True)
 
-# --------------------------------------------------------------
-# 6. Main Analysis
-# --------------------------------------------------------------
+# Run analysis
 if run_btn:
-    with st.spinner("Initializing analysis pipeline..."):
+    with st.spinner("Initializing..."):
         tmp_raw = Path(tempfile.mkdtemp(prefix="rc_raw_"))
         src_raw = PROJECT_ROOT / config["data"]["raw"]
         if src_raw.exists():
             shutil.copytree(src_raw, tmp_raw, dirs_exist_ok=True)
         else:
-            st.error("Raw GeoTIFFs not found. Run GEE export first.")
+            st.error("Raw GeoTIFFs missing.")
             st.stop()
 
         cli = [
@@ -128,91 +114,56 @@ if run_btn:
             "--config", str(PROJECT_ROOT / "configs" / "config.yaml"),
             "--h3-resolution", str(h3_res),
         ]
-        if lat is not None and lon is not None:
+        if lat and lon:
             cli += ["--lat", str(lat), "--lon", str(lon), "--radius", "100"]
 
         proc = subprocess.run(cli, cwd=PROJECT_ROOT, capture_output=True, text=True)
         shutil.rmtree(tmp_raw, ignore_errors=True)
 
         if proc.returncode != 0:
-            st.error("Analysis failed")
-            with st.expander("View error log"):
+            st.error("Failed")
+            with st.expander("Error"):
                 st.code(proc.stderr)
             st.stop()
 
-    # Load results
+    # Results
     csv_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
     if not csv_path.exists():
-        st.error("Results not generated.")
+        st.error("Results missing.")
         st.stop()
 
     df = pd.read_csv(csv_path)
 
-    # --------------------------------------------------------------
-    # 7. Results Display
-    # --------------------------------------------------------------
-    st.success("Analysis complete")
+    st.success("Complete")
 
-    # Metrics (card style)
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4 style="margin:0; color:#5D7B6A;">Hexagons</h4>
-            <p style="font-size:1.8rem; margin:0.4rem 0; color:#FAFAFA;">{len(df):,}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><h4 style="margin:0;color:#5D7B6A">Hexagons</h4><p style="font-size:1.8rem;margin:0.4rem 0;color:#FAFAFA">{len(df):,}</p></div>', unsafe_allow_html=True)
     with col2:
-        mean_score = df['suitability_score'].mean()
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4 style="margin:0; color:#5D7B6A;">Mean Score</h4>
-            <p style="font-size:1.8rem; margin:0.4rem 0; color:#FAFAFA;">{mean_score:.2f}/10</p>
-        </div>
-        """, unsafe_allow_html=True)
+        mean = df['suitability_score'].mean()
+        st.markdown(f'<div class="metric-card"><h4 style="margin:0;color:#5D7B6A">Mean Score</h4><p style="font-size:1.8rem;margin:0.4rem 0;color:#FAFAFA">{mean:.2f}/10</p></div>', unsafe_allow_html=True)
     with col3:
-        high_count = (df['suitability_score'] >= 8).sum()
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4 style="margin:0; color:#5D7B6A;">High Suitability</h4>
-            <p style="font-size:1.8rem; margin:0.4rem 0; color:#FAFAFA;">{high_count:,}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        high = (df['suitability_score'] >= 8).sum()
+        st.markdown(f'<div class="metric-card"><h4 style="margin:0;color:#5D7B6A">High Suitability</h4><p style="font-size:1.8rem;margin:0.4rem 0;color:#FAFAFA">{high:,}</p></div>', unsafe_allow_html=True)
 
-    # Data table
-    st.subheader("Suitability Scores by Hexagon")
-    st.dataframe(
-        df.sort_values("suitability_score", ascending=False),
-        use_container_width=True,
-        hide_index=True
-    )
+    st.subheader("Suitability Scores")
+    st.dataframe(df.sort_values("suitability_score", ascending=False), use_container_width=True, hide_index=True)
 
-    # Download
     csv = df.to_csv(index=False).encode()
-    st.download_button(
-        label="Download CSV",
-        data=csv,
-        file_name="biochar_suitability_scores.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
+    st.download_button("Download CSV", csv, "biochar_suitability_scores.csv", "text/csv", use_container_width=True)
 
-    # Map
     html_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
     if html_path.exists():
-        st.subheader("Interactive Suitability Map")
+        st.subheader("Interactive Map")
         with open(html_path, "r", encoding="utf-8") as f:
-            html = f.read()
-        st.components.v1.html(html, height=700, scrolling=True)
+            st.components.v1.html(f.read(), height=700, scrolling=True)
     else:
         st.warning("Map not generated.")
 
-# --------------------------------------------------------------
-# 8. Footer
-# --------------------------------------------------------------
+# Footer
 st.markdown("""
 <div class="footer">
-    <strong>Residual Carbon</strong> • McGill University Capstone Project<br>
+    <strong>Residual Carbon</strong> • McGill University Capstone<br>
     Promoting biodiversity through science-driven biochar deployment
 </div>
 """, unsafe_allow_html=True)
