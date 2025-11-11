@@ -116,12 +116,33 @@ if run_btn:
         else:
             st.warning("GeoTIFFs not found. Downloading from Google Drive...")
             try:
-                # Authenticate
-                gauth = GoogleAuth()
-                gauth.LoadCredentialsFile(PROJECT_ROOT / config["drive"]["credentials_file"])
+                # === READ CREDENTIALS FROM STREAMLIT SECRETS ===
+                import json
+                import os
+
+                if "google_drive" in st.secrets and "credentials" in st.secrets["google_drive"]:
+                    creds_json = st.secrets["google_drive"]["credentials"]
+                    creds_dict = json.loads(creds_json)
+                    # Save temporarily for PyDrive2
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                        json.dump(creds_dict, f)
+                        temp_path = f.name
+                    gauth.LoadCredentialsFile(temp_path)
+                    os.unlink(temp_path)  # Delete temp file
+                else:
+                    # Fallback: try local file (for local testing)
+                    creds_path = PROJECT_ROOT / config["drive"]["credentials_file"]
+                    if creds_path.exists():
+                        gauth.LoadCredentialsFile(str(creds_path))
+                    else:
+                        st.error("Google Drive credentials missing. Add [google_drive] credentials as a secret.")
+                        st.stop()
+
                 if gauth.credentials is None:
-                    st.error("Google Drive credentials missing. Add `credentials.json` as a secret.")
+                    st.error("Invalid or expired credentials.")
                     st.stop()
+
                 gauth.Authorize()
                 drive = GoogleDrive(gauth)
 
