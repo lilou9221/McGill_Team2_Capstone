@@ -101,10 +101,9 @@ if run_btn:
     with st.spinner("Initializing..."):
         tmp_raw = Path(tempfile.mkdtemp(prefix="rc_raw_"))
 
-        # === AUTO-DOWNLOAD FROM GOOGLE DRIVE ===
-        from pydrive2.auth import GoogleAuth
-        from pydrive2.drive import GoogleDrive
+
         import os
+        import json
 
         raw_dir = PROJECT_ROOT / config["data"]["raw"]
         raw_dir.mkdir(parents=True, exist_ok=True)
@@ -113,36 +112,61 @@ if run_btn:
         if raw_dir.exists() and len(list(raw_dir.glob("*.tif"))) >= 5:
             st.info("Using cached GeoTIFFs")
             shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
-        else:
+                else:
             st.warning("GeoTIFFs not found. Downloading from Google Drive...")
             try:
-                # === READ CREDENTIALS FROM STREAMLIT SECRETS ===
-                import json
-                import os
+                from google.oauth2 import service_account
+                from googleapiclient.discovery import build
+                from googleapiclient.http import MediaIoBaseDownload
+                import io
 
-                gauth = GoogleAuth()
-                if "google_drive" in st.secrets and "credentials" in st.secrets["google_drive"]:
-                    creds_json = st.secrets["google_drive"]["credentials"]
-                    creds_dict = json.loads(creds_json)
-                    # Save temporarily for PyDrive2
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                        json.dump(creds_dict, f)
-                        temp_path = f.name
-                    gauth.LoadCredentialsFile(temp_path)
-                    os.unlink(temp_path)  # Delete temp file
-                else:
-                    # Fallback: try local file (for local testing)
-                    creds_path = PROJECT_ROOT / config["drive"]["credentials_file"]
-                    if creds_path.exists():
-                        gauth.LoadCredentialsFile(str(creds_path))
-                    else:
-                        st.error("Google Drive credentials missing. Add [google_drive] credentials as a secret.")
-                        st.stop()
+                # Load credentials from Streamlit Secrets
+                creds_info = json.loads(st.secrets["google_drive"]["credentials"])
+                credentials = service_account.Credentials.from_service_account_info(
+                    creds_info, scopes=['https://www.googleapis.com/auth/drive.readonly']
+                )
 
-                if gauth.credentials is None:
-                    st.error("Invalid or expired credentials.")
+                # Build Drive service
+                service = build('drive', 'v3', credentials=credentials)
+
+                # Get folder ID
+                folder_id = config["drive"]["raw_data_folder_id"]
+
+                # List .tif files in folder
+                results = service.files().list(
+                    q=f"'{folder_id}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'",
+                    fields="files(id, name)"
+                ).execute()
+                files = results.get('files', [])
+
+                tif_files = [f for f in files if f['name'].endswith('.tif')]
+
+                if not tif_files:
+                    st.error("No .tif files found in Drive folder.")
                     st.stop()
+
+                for file in tif_files:
+                    filepath = raw_dir / file['name']
+                    if not filepath.exists():
+                        with st.spinner(f"Downloading {file['name']}..."):
+                            request = service.files().get_media(fileId=file['id'])
+                            fh = io.BytesIO()
+                            downloader = MediaIoBaseDownload(fh, request)
+                            done = False
+                            while not done:
+                                status, done = downloader.next_chunk()
+                            fh.seek(0)
+                            with open(filepath, 'wb') as f:
+                                f.write(fh.read())
+                    else:
+                        st.info(f"{file['name']} already downloaded")
+
+                st.success("All GeoTIFFs downloaded!")
+                shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
+
+            except Exception as e:
+                st.error(f"Drive download failed: {e}")
+                st.stop()
 
                 gauth.Authorize()
                 drive = GoogleDrive(gauth)
