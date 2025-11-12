@@ -197,33 +197,27 @@ if run_btn:
                 st.stop()
 
         # === RUN MAIN PIPELINE ===
-        # Ensure PyYAML is available before running subprocess
-        # (subprocess runs in separate process, so dependencies must be installed)
-        try:
-            import yaml  # Verify it's available
-        except ImportError:
-            st.error(
-                "**Missing Dependency: PyYAML**\n\n"
-                "PyYAML is not available. Please ensure it's in requirements.txt and restart Streamlit Cloud deployment.\n\n"
-                "```txt\npyyaml>=6.0\n```"
-            )
-            st.stop()
+        # Use wrapper script that ensures dependencies are installed
+        wrapper_script = PROJECT_ROOT / "run_analysis.py"
         
+        # Prepare command arguments
         cli = [
-            "python", str(PROJECT_ROOT / "src" / "main.py"),
+            sys.executable, str(wrapper_script),
             "--config", str(PROJECT_ROOT / "configs" / "config.yaml"),
             "--h3-resolution", str(h3_res),
         ]
         if lat and lon:
             cli += ["--lat", str(lat), "--lon", str(lon), "--radius", "100"]
 
-        proc = subprocess.run(
-            cli, 
-            cwd=PROJECT_ROOT, 
-            capture_output=True, 
-            text=True,
-            env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)}
-        )
+        # Run main pipeline with proper environment
+        with st.spinner("Running analysis pipeline..."):
+            proc = subprocess.run(
+                cli, 
+                cwd=PROJECT_ROOT, 
+                capture_output=True, 
+                text=True,
+                env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)}
+            )
         shutil.rmtree(tmp_raw, ignore_errors=True)
 
         if proc.returncode != 0:

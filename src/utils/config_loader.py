@@ -7,10 +7,25 @@ Loads and validates configuration from YAML files.
 try:
     import yaml
 except ImportError:
-    raise ImportError(
-        "PyYAML is not installed. Please install it using: pip install pyyaml\n"
-        "Or install all dependencies: pip install -r requirements.txt"
-    )
+    # Try to install PyYAML automatically (for Streamlit Cloud compatibility)
+    import subprocess
+    import sys
+    try:
+        print("PyYAML not found. Attempting to install...", file=sys.stderr, flush=True)
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", "pyyaml>=6.0",
+            "--quiet", "--disable-pip-version-check", "--user"
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        import yaml
+        print("PyYAML installed successfully.", file=sys.stderr, flush=True)
+    except (subprocess.CalledProcessError, ImportError):
+        # If installation fails or import still fails, raise helpful error
+        raise ImportError(
+            "PyYAML is not installed and could not be installed automatically.\n"
+            "Please install it using: pip install pyyaml\n"
+            "Or install all dependencies: pip install -r requirements.txt\n"
+            "For Streamlit Cloud, ensure 'pyyaml>=6.0' is in requirements.txt and restart deployment."
+        )
 
 from pathlib import Path
 from typing import Dict, Any, Optional
