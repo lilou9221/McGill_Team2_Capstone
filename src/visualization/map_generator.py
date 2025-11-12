@@ -185,3 +185,4 @@ def create_suitability_map(
             'file_path': output_path
         }
 
+

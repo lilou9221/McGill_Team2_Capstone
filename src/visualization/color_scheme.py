@@ -103,3 +103,4 @@ def get_color_scheme_info() -> dict:
         "description": "Green = most suitable, Yellow = moderately suitable, Red = least suitable"
     }
 
+
