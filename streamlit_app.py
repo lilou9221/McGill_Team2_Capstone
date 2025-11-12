@@ -10,18 +10,38 @@ import os
 import json
 import io
 
-# Check for required dependencies
-try:
-    import yaml
-except ImportError:
+# Check for required dependencies and install if missing (for Streamlit Cloud)
+def ensure_dependency(package_name, import_name=None):
+    """Ensure a Python package is installed, try to install if missing."""
+    import_name = import_name or package_name
+    try:
+        __import__(import_name)
+        return True
+    except ImportError:
+        try:
+            # Try to install the package
+            import subprocess
+            import sys
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install", package_name, "--quiet"
+            ])
+            # Try importing again
+            __import__(import_name)
+            return True
+        except Exception as e:
+            return False
+
+# Check for PyYAML
+if not ensure_dependency("PyYAML", "yaml"):
     st.error(
         "**Missing Dependency: PyYAML**\n\n"
-        "PyYAML is not installed. Please install it:\n\n"
-        "```bash\npip install pyyaml\n```\n\n"
-        "Or install all dependencies:\n\n"
-        "```bash\npip install -r requirements.txt\n```"
+        "PyYAML could not be installed automatically. Please ensure it's in requirements.txt:\n\n"
+        "```txt\nPyYAML>=6.0\n```\n\n"
+        "For Streamlit Cloud, restart your deployment after updating requirements.txt."
     )
     st.stop()
+
+import yaml
 
 # Project setup
 PROJECT_ROOT = Path(__file__).parent.resolve()
@@ -177,6 +197,18 @@ if run_btn:
                 st.stop()
 
         # === RUN MAIN PIPELINE ===
+        # Ensure PyYAML is available before running subprocess
+        # (subprocess runs in separate process, so dependencies must be installed)
+        try:
+            import yaml  # Verify it's available
+        except ImportError:
+            st.error(
+                "**Missing Dependency: PyYAML**\n\n"
+                "PyYAML is not available. Please ensure it's in requirements.txt and restart Streamlit Cloud deployment.\n\n"
+                "```txt\npyyaml>=6.0\n```"
+            )
+            st.stop()
+        
         cli = [
             "python", str(PROJECT_ROOT / "src" / "main.py"),
             "--config", str(PROJECT_ROOT / "configs" / "config.yaml"),
@@ -185,13 +217,31 @@ if run_btn:
         if lat and lon:
             cli += ["--lat", str(lat), "--lon", str(lon), "--radius", "100"]
 
-        proc = subprocess.run(cli, cwd=PROJECT_ROOT, capture_output=True, text=True)
+        proc = subprocess.run(
+            cli, 
+            cwd=PROJECT_ROOT, 
+            capture_output=True, 
+            text=True,
+            env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)}
+        )
         shutil.rmtree(tmp_raw, ignore_errors=True)
 
         if proc.returncode != 0:
             st.error("Analysis failed")
+            
+            # Check if it's a yaml import error
+            error_output = proc.stderr or proc.stdout
+            if "ModuleNotFoundError" in error_output and "yaml" in error_output.lower():
+                st.error(
+                    "**PyYAML Missing in Subprocess**\n\n"
+                    "The analysis pipeline requires PyYAML. Please ensure `pyyaml>=6.0` is in requirements.txt "
+                    "and restart your Streamlit Cloud deployment.\n\n"
+                    "Current requirements.txt should include:\n"
+                    "```txt\npyyaml>=6.0\n```"
+                )
+            
             with st.expander("View error log"):
-                st.code(proc.stderr)
+                st.code(error_output)
             st.stop()
 
     # === DISPLAY RESULTS ===
