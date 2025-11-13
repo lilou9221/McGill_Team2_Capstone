@@ -19,6 +19,30 @@ import pandas as pd
 import rasterio
 from rasterio.transform import xy
 
+try:
+    from src.utils.cache import (
+        get_cache_dir,
+        generate_dataframe_cache_key,
+        is_dataframe_cache_valid,
+        load_cached_dataframes,
+        save_dataframes_to_cache,
+        save_dataframe_cache_metadata,
+    )
+except ModuleNotFoundError:
+    # Fallback when running as script
+    import sys
+    SCRIPT_ROOT = Path(__file__).resolve().parents[3]
+    if str(SCRIPT_ROOT) not in sys.path:
+        sys.path.insert(0, str(SCRIPT_ROOT))
+    from src.utils.cache import (
+        get_cache_dir,
+        generate_dataframe_cache_key,
+        is_dataframe_cache_valid,
+        load_cached_dataframes,
+        save_dataframes_to_cache,
+        save_dataframe_cache_metadata,
+    )
+
 VALUE_UNIT_PATTERNS: Sequence[Tuple[str, str]] = (
     ("soil_temperature", "K"),
     ("soil_temp", "K"),
@@ -147,10 +171,14 @@ def convert_all_rasters_to_dataframes(
     nodata_handling: str = "skip",
     persist_dir: Optional[Path] = None,
     clean_persist_dir: bool = True,
+    use_cache: bool = True,
+    cache_dir: Optional[Path] = None,
+    processed_dir: Optional[Path] = None,
 ) -> Dict[str, pd.DataFrame]:
     """
     Convert all rasters in ``input_dir`` into pandas DataFrames.
-
+    Includes caching to avoid re-converting the same rasters.
+    
     Parameters
     ----------
     input_dir
@@ -166,7 +194,13 @@ def convert_all_rasters_to_dataframes(
     clean_persist_dir
         When ``True`` and ``persist_dir`` is provided, existing CSV files are
         removed before writing new ones.
-
+    use_cache
+        Whether to use cache (default: True).
+    cache_dir
+        Cache directory. If None, uses default cache directory.
+    processed_dir
+        Processed data directory. Used to infer cache directory if cache_dir is None.
+    
     Returns
     -------
     Dict[str, pd.DataFrame]
@@ -174,12 +208,70 @@ def convert_all_rasters_to_dataframes(
     """
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
-
+    
     tif_files = sorted(input_dir.glob(pattern))
     if not tif_files:
         print(f"No GeoTIFF files found in {input_dir} matching pattern {pattern}")
         return {}
-
+    
+    # Try to use cache if enabled
+    cache_used = False
+    if use_cache:
+        # Get cache directory
+        if cache_dir is None:
+            if processed_dir is not None:
+                cache_dir = get_cache_dir(processed_dir, cache_type="raster_to_dataframe")
+            else:
+                # Try to infer from input_dir structure
+                if "processed" in str(input_dir) or "cache" in str(input_dir):
+                    processed_dir = input_dir.parent
+                elif "raw" in str(input_dir):
+                    processed_dir = input_dir.parent / "processed"
+                else:
+                    # Fallback: use a default cache location
+                    processed_dir = input_dir.parent.parent / "processed"
+                
+                cache_dir = get_cache_dir(processed_dir, cache_type="raster_to_dataframe")
+        
+        # Generate cache key
+        cache_key = generate_dataframe_cache_key(
+            source_files=tif_files,
+            band=band,
+            nodata_handling=nodata_handling,
+            pattern=pattern
+        )
+        
+        # Check if cache is valid
+        is_valid, reason = is_dataframe_cache_valid(
+            cache_dir=cache_dir,
+            cache_key=cache_key,
+            source_files=tif_files,
+            band=band,
+            nodata_handling=nodata_handling,
+            pattern=pattern
+        )
+        
+        if is_valid:
+            # Use cached DataFrames
+            cached_dataframes = load_cached_dataframes(cache_dir, cache_key)
+            if cached_dataframes:
+                cache_used = True
+                print(f"\nUsing cached DataFrames (cache key: {cache_key[:8]}...)")
+                print(f"  Found {len(cached_dataframes)} cached DataFrame(s)")
+                for name in cached_dataframes.keys():
+                    df = cached_dataframes[name]
+                    print(f"  Loaded: {name} ({len(df):,} rows)")
+                
+                cache_subdir = cache_dir / cache_key
+                print(f"  Cache location: {cache_subdir}")
+                print(f"  Time saved: Using cached DataFrames instead of converting")
+                
+                return cached_dataframes
+        else:
+            if reason:
+                print(f"\nCache invalid or not found: {reason}")
+                print(f"  Will convert and cache results (cache key: {cache_key[:8]}...)")
+    
     if persist_dir:
         persist_dir.mkdir(parents=True, exist_ok=True)
         if clean_persist_dir:
@@ -197,9 +289,9 @@ def convert_all_rasters_to_dataframes(
                 print(
                     f"\nRemoved {removed} existing CSV snapshot(s) from {persist_dir}"
                 )
-
+    
     print(f"\nFound {len(tif_files)} GeoTIFF file(s) to convert to DataFrames")
-
+    
     table_map: Dict[str, pd.DataFrame] = {}
     for tif_path in tif_files:
         try:
@@ -210,19 +302,64 @@ def convert_all_rasters_to_dataframes(
                 nodata_handling=nodata_handling,
             )
             table_map[tif_path.stem] = df
-
+            
             print(f"  Rows: {len(df):,}")
             print(f"  Columns: {list(df.columns)}")
-
+            
             if persist_dir:
                 snapshot_path = persist_dir / f"{tif_path.stem}.csv"
                 _persist_dataframe(df, snapshot_path)
                 size_mb = snapshot_path.stat().st_size / (1024 * 1024)
                 print(f"  Snapshot saved to {snapshot_path} ({size_mb:.2f} MB)")
-
+        
         except Exception as exc:
             print(f"  Error converting {tif_path.name}: {type(exc).__name__}: {exc}")
-
+    
+    # Save to cache if enabled and cache wasn't used
+    if use_cache and table_map and not cache_used:
+        if cache_dir is None:
+            if processed_dir is not None:
+                cache_dir = get_cache_dir(processed_dir, cache_type="raster_to_dataframe")
+            else:
+                if "processed" in str(input_dir) or "cache" in str(input_dir):
+                    processed_dir = input_dir.parent
+                elif "raw" in str(input_dir):
+                    processed_dir = input_dir.parent / "processed"
+                else:
+                    processed_dir = input_dir.parent.parent / "processed"
+                
+                cache_dir = get_cache_dir(processed_dir, cache_type="raster_to_dataframe")
+        
+        cache_key = generate_dataframe_cache_key(
+            source_files=tif_files,
+            band=band,
+            nodata_handling=nodata_handling,
+            pattern=pattern
+        )
+        
+        # Save DataFrames to cache (use Parquet for efficiency)
+        cached_paths = save_dataframes_to_cache(
+            cache_dir=cache_dir,
+            cache_key=cache_key,
+            dataframes=table_map,
+            use_parquet=True
+        )
+        
+        # Save cache metadata
+        save_dataframe_cache_metadata(
+            cache_dir=cache_dir,
+            cache_key=cache_key,
+            source_files=tif_files,
+            band=band,
+            nodata_handling=nodata_handling,
+            pattern=pattern,
+            cached_dataframes=cached_paths
+        )
+        
+        cache_subdir = cache_dir / cache_key
+        print(f"\n  Cached DataFrames for future use (cache key: {cache_key[:8]}...)")
+        print(f"  Cache location: {cache_subdir}")
+    
     print(
         f"\nSuccessfully converted {len(table_map)} of {len(tif_files)} raster(s) "
         "to DataFrames"

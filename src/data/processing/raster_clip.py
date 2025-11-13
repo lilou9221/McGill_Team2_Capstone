@@ -214,7 +214,7 @@ def clip_all_rasters_to_circle(
                 # Fallback: use a default cache location relative to output_dir
                 processed_dir = output_dir.parent.parent / "processed"
             
-            cache_dir = get_cache_dir(processed_dir)
+            cache_dir = get_cache_dir(processed_dir, cache_type="clipped_rasters")
         
         # Generate cache key
         cache_key = generate_cache_key(lat, lon, radius_km, tif_files)
@@ -284,7 +284,7 @@ def clip_all_rasters_to_circle(
                 processed_dir = output_dir.parent
             else:
                 processed_dir = output_dir.parent.parent / "processed"
-            cache_dir = get_cache_dir(processed_dir)
+            cache_dir = get_cache_dir(processed_dir, cache_type="clipped_rasters")
         
         cache_key = generate_cache_key(lat, lon, radius_km, tif_files)
         cache_subdir = get_cache_subdirectory(cache_dir, cache_key)

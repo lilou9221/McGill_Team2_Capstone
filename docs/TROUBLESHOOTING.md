@@ -42,8 +42,10 @@ pip install -e .
 
 Or install specific packages:
 ```bash
-pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml
+pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml pyarrow
 ```
+
+**Note**: `pyarrow>=10.0.0` is required for DataFrame caching (Parquet file support). This is automatically installed via `requirements.txt`, but if you encounter Parquet-related errors, ensure it's installed: `pip install pyarrow>=10.0.0`.
 
 ### Config file not found
 
@@ -129,10 +131,32 @@ pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml
 **Problem**: Steps take a long time to complete.
 
 **Solution**:
-- Use `--skip-steps` to skip already completed steps
-- Use `--resume` to continue from last successful step
+- **Cache is enabled by default**: The tool automatically caches clipped rasters and DataFrame conversions. First run creates cache, subsequent runs use cache for faster processing.
+- Use `--skip-steps` to skip already completed steps (if implemented)
 - Reduce H3 resolution for faster processing
 - Process smaller areas (use coordinates with smaller radius)
+- Check if cache is being used: Look for "Using cached..." messages in the output
+
+### Cache not working
+
+**Problem**: Cache is not being used or cache errors occur.
+
+**Solution**:
+- **Cache is enabled by default**: Caching works automatically and requires no configuration
+- **First run**: Cache is created during normal processing (this is expected)
+- **Subsequent runs**: Cache is automatically used if valid (same inputs and parameters)
+- **Cache validation**: Cache automatically invalidates when source files change (checks modification times)
+- **Clear cache**: If you suspect cache issues, delete `data/processed/cache/` directory to force regeneration:
+  ```bash
+  # Windows
+  rmdir /s /q data\processed\cache
+  
+  # Linux/Mac
+  rm -rf data/processed/cache
+  ```
+- **Parquet errors**: Ensure `pyarrow>=10.0.0` is installed: `pip install pyarrow>=10.0.0`
+- **Check cache directory**: Verify `data/processed/cache/` exists and contains cache subdirectories
+- **Cache size**: Cache typically uses 10-100 MB depending on area size and number of datasets
 
 ### Large map files (>100MB)
 

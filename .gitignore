@@ -44,6 +44,9 @@ data/processed/*.csv
 data/processed/*.json
 data/processed/cache/
 !data/processed/cache/.gitkeep
+data/processed/cache/**/*.parquet
+data/processed/cache/**/*.csv
+data/processed/cache/**/*.json
 output/html/*.html
 output/maps/*
 logs/*.log

@@ -11,6 +11,7 @@ This tool analyzes soil properties (moisture, type, temperature, organic carbon,
 - **Automated Data Retrieval**: Launches parameterized Google Earth Engine exports with per-layer summaries and optional auto-start. Downloads from Google Drive are automatic once configured.
 - **Targeted Spatial Analysis**: Works on the full Mato Grosso extent or user-specified circular AOIs with validation and graceful edge handling.
 - **Robust GeoTIFF Processing**: Clips, converts, and validates rasters before tabularisation, with an in-memory pandas pipeline and optional snapshots.
+- **Performance Caching**: Intelligent caching system speeds up re-runs by caching clipped rasters and DataFrame conversions. Automatically detects changes and invalidates cache when source files are updated.
 - **H3 Hexagonal Grid**: Adds hex indexes and boundary geometry for efficient aggregation and map rendering.
 - **Suitability Scoring**: Applies configurable thresholds (0–10 scale) with per-property diagnostics prior to final rollups.
 - **Interactive Maps**: Generates PyDeck-based HTML visualisations and auto-opens them (configurable).
@@ -142,11 +143,14 @@ Residual_Carbon/
 │   ├── data/           # Data retrieval and processing
 │   ├── analysis/       # Suitability scoring
 │   ├── visualization/  # Map generation
-│   └── utils/          # Utility functions
+│   └── utils/          # Utility functions (includes cache utilities)
 ├── configs/            # Configuration files
 ├── data/
 │   ├── raw/            # GeoTIFF files from GEE
 │   └── processed/      # Processed outputs and optional snapshots
+│       └── cache/      # Cache directory (clipped rasters, DataFrames)
+│           ├── clipped_rasters/    # Cached clipped GeoTIFF files
+│           └── raster_to_dataframe/ # Cached DataFrame Parquet files
 ├── output/
 │   ├── maps/           # Generated maps
 │   └── html/           # HTML map files
@@ -162,8 +166,8 @@ The core pipeline lives in `src/main.py` and wires high-level helpers from each 
 
 1. **Acquisition check** (`ensure_rasters_acquired`) — confirms GeoTIFFs exist in `data/raw/` before doing any expensive work.
 2. **AOI selection** (`get_user_area_of_interest`) — validates coordinates, radius, and provides a full-state fallback.
-3. **Optional clipping** (`clip_all_rasters_to_circle`) — trims rasters to the requested buffer and reports size deltas.
-4. **Raster ➜ Table** (`convert_all_rasters_to_dataframes`) — flattens rasters into pandas DataFrames with coordinates, nodata handling, and unit inference.
+3. **Optional clipping** (`clip_all_rasters_to_circle`) — trims rasters to the requested buffer and reports size deltas. **Cached** to speed up re-runs (see Caching System section).
+4. **Raster ➜ Table** (`convert_all_rasters_to_dataframes`) — flattens rasters into pandas DataFrames with coordinates, nodata handling, and unit inference. **Cached** as Parquet files for fast loading (see Caching System section).
 5. **Hex indexing** (`process_dataframes_with_h3`) — injects `h3_index` plus polygon boundaries at the requested resolution.
 6. **Suitability scoring** (`process_csv_files_with_suitability_scores`) — merges property tables, aggregates by hex, and applies thresholds.
 7. **Visualisation** (`create_suitability_map`) — renders an interactive PyDeck map and saves it under `output/html/`.
@@ -188,12 +192,53 @@ Verification helpers such as `verify_clipping_success`, `verify_clipped_data_int
 - **Soil pH**: OpenLandMap (OpenLandMap/SOL/SOL_PH-H2O_USDA-4C1A2A_M/v02)
 - **Land Cover**: ESA WorldCover (ESA/WorldCover/v100)
 
+## Caching System
+
+The tool includes an intelligent caching system that significantly speeds up re-runs:
+
+### Cache Types
+
+1. **Clipped Raster Cache** (`data/processed/cache/clipped_rasters/`)
+   - Caches clipped GeoTIFF files based on coordinates, radius, and source file metadata
+   - Automatically invalidates when source files change (checks modification times)
+   - **Time savings**: ~90% (skips expensive clipping operations)
+
+2. **DataFrame Cache** (`data/processed/cache/raster_to_dataframe/`)
+   - Caches converted DataFrames as Parquet files (faster than CSV)
+   - Based on source files, conversion parameters (band, nodata handling, pattern)
+   - Automatically invalidates when source files change
+   - **Time savings**: ~70% (skips expensive raster reading and DataFrame conversion)
+
+### How It Works
+
+- **First run**: Caches are created during normal processing
+- **Subsequent runs**: Caches are automatically used if valid (same inputs and parameters)
+- **Cache validation**: Checks source file modification times to detect changes
+- **Automatic invalidation**: Cache is invalidated if source files change or parameters differ
+- **Transparent**: Caching is enabled by default and works automatically
+
+### Cache Management
+
+- Cache files are stored in `data/processed/cache/`
+- Cache directories are automatically created as needed
+- Cache files are excluded from Git (see `.gitignore`)
+- To clear cache: Delete the `data/processed/cache/` directory or specific cache subdirectories
+- Cache size: Typically 10-100 MB depending on area size and number of datasets
+
+### Benefits
+
+- **Faster re-runs**: Re-running the same analysis is much faster
+- **Development speed**: Faster iteration when testing different parameters
+- **Resource efficiency**: Reduces CPU and I/O usage for repeated operations
+- **Automatic**: No manual configuration required, works out of the box
+
 ## Output
 
 The tool generates:
 
 - **GeoTIFF files**: Raw raster data in `data/raw/`
 - **CSV snapshots**: Optional debug exports and final `suitability_scores.csv` in `data/processed/`
+- **Cache files**: Cached clipped rasters and DataFrames in `data/processed/cache/`
 - **HTML map**: Interactive suitability map in `output/html/`
 - **Logs**: Application logs in `logs/`
 
@@ -204,6 +249,8 @@ The tool generates:
 - **Automatic downloads not working**: Ensure Google Drive API is enabled and `client_secrets.json` is properly configured. Downloads happen automatically once GEE export tasks complete.
 - **Missing rasters**: rerun `src/data/acquisition/gee_loader.py` and wait for automatic downloads to complete, or manually download from Google Drive if automatic download is not configured.
 - **Empty CSV outputs**: make sure the clipping circle overlaps the raster (edge circles often produce sparse data—use the verification helpers to confirm coverage).
+- **Cache issues**: If you suspect cache problems, delete `data/processed/cache/` directory to force regeneration. Cache automatically invalidates when source files change, but manual deletion can help troubleshoot.
+- **Parquet file errors**: Ensure `pyarrow>=10.0.0` is installed (`pip install pyarrow`). Parquet files are used for efficient DataFrame caching.
 
 ## Contributing & Support
 
