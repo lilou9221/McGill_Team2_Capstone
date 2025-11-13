@@ -72,7 +72,7 @@ def main():
     parser.add_argument("--lat", type=float, default=None, help="Latitude (optional)")
     parser.add_argument("--lon", type=float, default=None, help="Longitude (optional)")
     parser.add_argument("--radius", type=float, default=100, help="Radius in km (default: 100)")
-    parser.add_argument("--h3-resolution", type=int, default=7, help="H3 resolution (default: 7)")
+    parser.add_argument("--h3-resolution", type=int, default=7, help="H3 resolution for clipped areas (default: 7). Full state uses resolution 9 automatically.")
     parser.add_argument("--config", type=str, default="configs/config.yaml", help="Config file")
     
     args = parser.parse_args()
@@ -102,12 +102,17 @@ def main():
         # Use full state - no clipping needed
         tif_dir = raw_dir
         print("Using full Mato Grosso state data")
+        # Use coarser H3 resolution (9) for full state
+        h3_resolution = 9
+        print("Using H3 resolution 9 for full state (coarser resolution)")
     else:
         # Clip to 100km radius
         print(f"Clipping to {area.radius_km}km radius around ({area.lat}, {area.lon})")
         circle = create_circle_buffer(area.lat, area.lon, area.radius_km)
         tif_dir = Path(tempfile.mkdtemp(prefix="residual_carbon_clip_"))
         clip_all_rasters_to_circle(raw_dir, tif_dir, circle)
+        # Use specified/default H3 resolution for clipped area
+        h3_resolution = args.h3_resolution
     
     # Step 2: Convert GeoTIFFs to DataFrames (lon/lat/value tables)
     print("Converting GeoTIFFs to DataFrames...")
@@ -127,10 +132,10 @@ def main():
         shutil.rmtree(tif_dir, ignore_errors=True)
 
     # Step 3: Add H3 indexes before scoring
-    print(f"Adding H3 indexes (resolution {args.h3_resolution})...")
+    print(f"Adding H3 indexes (resolution {h3_resolution})...")
     tables_with_h3 = process_dataframes_with_h3(
         tables=tables,
-        resolution=args.h3_resolution,
+        resolution=h3_resolution,
         lat_column="lat",
         lon_column="lon",
         persist_dir=h3_snapshot_dir

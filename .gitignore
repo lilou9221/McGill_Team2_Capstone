@@ -38,6 +38,8 @@ venv.bak/
 .DS_Store
 
 # Project specific
+data/raw/*.tif
+data/raw/*.tiff
 data/processed/*.csv
 data/processed/*.json
 output/html/*.html
