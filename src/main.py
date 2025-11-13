@@ -114,7 +114,7 @@ def main():
         # Use cache for clipped rasters (enabled by default)
         # Pass processed_dir to get correct cache directory
         from src.utils.cache import get_cache_dir
-        cache_dir = get_cache_dir(processed_dir)
+        cache_dir = get_cache_dir(processed_dir, cache_type="clipped_rasters")
         
         clipped_files, cache_used = clip_all_rasters_to_circle(
             input_dir=raw_dir,
@@ -133,13 +133,15 @@ def main():
         # Use specified/default H3 resolution for clipped area
         h3_resolution = args.h3_resolution
     
-    # Step 2: Convert GeoTIFFs to DataFrames (lon/lat/value tables)
+    # Step 2: Convert GeoTIFFs to DataFrames (lon/lat/value tables) with caching
     print("Converting GeoTIFFs to DataFrames...")
     tables = convert_all_rasters_to_dataframes(
         input_dir=tif_dir,
         band=1,
         nodata_handling="skip",
-        persist_dir=snapshot_dir
+        persist_dir=snapshot_dir,
+        use_cache=True,
+        processed_dir=processed_dir
     )
 
     if not tables:

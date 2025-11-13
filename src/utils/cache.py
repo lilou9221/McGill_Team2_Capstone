@@ -7,8 +7,14 @@ Provides caching functionality for clipped rasters and other expensive operation
 import hashlib
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
+
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
 
 
 def generate_cache_key(lat: float, lon: float, radius_km: float, source_files: List[Path]) -> str:
@@ -60,7 +66,7 @@ def generate_cache_key(lat: float, lon: float, radius_km: float, source_files: L
     return cache_key
 
 
-def get_cache_dir(processed_dir: Path) -> Path:
+def get_cache_dir(processed_dir: Path, cache_type: str = "clipped_rasters") -> Path:
     """
     Get the cache directory path.
     
@@ -68,13 +74,16 @@ def get_cache_dir(processed_dir: Path) -> Path:
     ----------
     processed_dir : Path
         Path to processed data directory
+    cache_type : str, optional
+        Type of cache (default: "clipped_rasters")
+        Options: "clipped_rasters", "raster_to_dataframe", "h3_indexes", etc.
     
     Returns
     -------
     Path
         Path to cache directory
     """
-    cache_dir = processed_dir / "cache" / "clipped_rasters"
+    cache_dir = processed_dir / "cache" / cache_type
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 
@@ -357,4 +366,357 @@ def clear_cache(cache_dir: Path, cache_key: Optional[str] = None) -> int:
             count += 1
         
         return count
+
+
+# DataFrame cache functions
+def generate_dataframe_cache_key(
+    source_files: List[Path],
+    band: int = 1,
+    nodata_handling: str = "skip",
+    pattern: str = "*.tif"
+) -> str:
+    """
+    Generate a cache key for raster to DataFrame conversion.
+    
+    Parameters
+    ----------
+    source_files : List[Path]
+        List of source GeoTIFF files
+    band : int, optional
+        Raster band index (default: 1)
+    nodata_handling : str, optional
+        Nodata handling strategy (default: "skip")
+    pattern : str, optional
+        File pattern used (default: "*.tif")
+    
+    Returns
+    -------
+    str
+        Cache key (hexadecimal hash)
+    """
+    # Create hash components: conversion parameters and source file info
+    hash_components = [
+        f"band_{band}",
+        f"nodata_{nodata_handling}",
+        f"pattern_{pattern}",
+    ]
+    
+    # Add source file info (name and modification time)
+    # Sort files for consistent hashing
+    sorted_files = sorted(source_files, key=lambda p: p.name)
+    for file_path in sorted_files:
+        if file_path.exists():
+            # Use filename and modification time
+            mtime = file_path.stat().st_mtime
+            file_info = f"{file_path.name}_{mtime}"
+            hash_components.append(file_info)
+    
+    # Create hash from all components
+    hash_string = "|".join(hash_components)
+    cache_key = hashlib.md5(hash_string.encode()).hexdigest()
+    
+    return cache_key
+
+
+def save_dataframe_cache_metadata(
+    cache_dir: Path,
+    cache_key: str,
+    source_files: List[Path],
+    band: int,
+    nodata_handling: str,
+    pattern: str,
+    cached_dataframes: Dict[str, Path]
+) -> None:
+    """
+    Save DataFrame cache metadata to JSON file.
+    
+    Parameters
+    ----------
+    cache_dir : Path
+        Cache directory
+    cache_key : str
+        Cache key
+    source_files : List[Path]
+        List of source files
+    band : int
+        Raster band index
+    nodata_handling : str
+        Nodata handling strategy
+    pattern : str
+        File pattern
+    cached_dataframes : Dict[str, Path]
+        Dictionary mapping DataFrame names to cached file paths
+    """
+    metadata = {
+        "cache_key": cache_key,
+        "band": band,
+        "nodata_handling": nodata_handling,
+        "pattern": pattern,
+        "created_at": datetime.now().isoformat(),
+        "source_files": [
+            {
+                "path": str(file_path),
+                "name": file_path.name,
+                "mtime": file_path.stat().st_mtime if file_path.exists() else None,
+                "size": file_path.stat().st_size if file_path.exists() else None,
+            }
+            for file_path in sorted(source_files, key=lambda p: p.name)
+        ],
+        "cached_dataframes": {
+            name: str(path) for name, path in cached_dataframes.items()
+        },
+    }
+    
+    metadata_path = get_cache_metadata_path(cache_dir, cache_key)
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+
+def load_dataframe_cache_metadata(cache_dir: Path, cache_key: str) -> Optional[Dict]:
+    """
+    Load DataFrame cache metadata from JSON file.
+    
+    Parameters
+    ----------
+    cache_dir : Path
+        Cache directory
+    cache_key : str
+        Cache key
+    
+    Returns
+    -------
+    Optional[Dict]
+        Metadata dictionary if found, None otherwise
+    """
+    return load_cache_metadata(cache_dir, cache_key)
+
+
+def is_dataframe_cache_valid(
+    cache_dir: Path,
+    cache_key: str,
+    source_files: List[Path],
+    band: int,
+    nodata_handling: str,
+    pattern: str
+) -> Tuple[bool, Optional[str]]:
+    """
+    Check if DataFrame cache is valid by comparing source file metadata and parameters.
+    
+    Parameters
+    ----------
+    cache_dir : Path
+        Cache directory
+    cache_key : str
+        Cache key
+    source_files : List[Path]
+        List of source files to check
+    band : int
+        Raster band index
+    nodata_handling : str
+        Nodata handling strategy
+    pattern : str
+        File pattern
+    
+    Returns
+    -------
+    Tuple[bool, Optional[str]]
+        (is_valid, reason) - True if cache is valid, False otherwise with reason
+    """
+    metadata = load_dataframe_cache_metadata(cache_dir, cache_key)
+    if metadata is None:
+        return False, "Cache metadata not found"
+    
+    # Check parameters match
+    if metadata.get("band") != band:
+        return False, f"Band mismatch: {metadata.get('band')} != {band}"
+    
+    if metadata.get("nodata_handling") != nodata_handling:
+        return False, f"Nodata handling mismatch: {metadata.get('nodata_handling')} != {nodata_handling}"
+    
+    if metadata.get("pattern") != pattern:
+        return False, f"Pattern mismatch: {metadata.get('pattern')} != {pattern}"
+    
+    # Check if all cached DataFrames exist
+    cached_dataframes = metadata.get("cached_dataframes", {})
+    for name, cached_path_str in cached_dataframes.items():
+        cached_path = Path(cached_path_str)
+        if not cached_path.exists():
+            return False, f"Cached DataFrame not found: {name} ({cached_path.name})"
+    
+    # Check if source files have changed
+    source_file_info = {info["name"]: info["mtime"] for info in metadata.get("source_files", [])}
+    
+    for source_file in source_files:
+        if not source_file.exists():
+            return False, f"Source file not found: {source_file.name}"
+        
+        # Check if file is in metadata
+        if source_file.name not in source_file_info:
+            return False, f"New source file detected: {source_file.name}"
+        
+        # Check if modification time has changed
+        current_mtime = source_file.stat().st_mtime
+        cached_mtime = source_file_info[source_file.name]
+        
+        if current_mtime != cached_mtime:
+            return False, f"Source file changed: {source_file.name} (mtime: {current_mtime} != {cached_mtime})"
+    
+    # Check if there are missing source files (files removed)
+    current_file_names = {file.name for file in source_files}
+    cached_file_names = set(source_file_info.keys())
+    
+    if cached_file_names != current_file_names:
+        return False, f"Source file list changed: {cached_file_names} != {current_file_names}"
+    
+    return True, None
+
+
+def get_cached_dataframe_files(cache_dir: Path, cache_key: str) -> Optional[Dict[str, Path]]:
+    """
+    Get list of cached DataFrame files for a cache key.
+    
+    Parameters
+    ----------
+    cache_dir : Path
+        Cache directory
+    cache_key : str
+        Cache key
+    
+    Returns
+    -------
+    Optional[Dict[str, Path]]
+        Dictionary mapping DataFrame names to cached file paths if found, None otherwise
+    """
+    if not PANDAS_AVAILABLE:
+        return None
+    
+    metadata = load_dataframe_cache_metadata(cache_dir, cache_key)
+    if metadata is None:
+        return None
+    
+    cached_dataframes = metadata.get("cached_dataframes", {})
+    if not cached_dataframes:
+        return None
+    
+    # Get cache subdirectory for this cache key
+    cache_subdir = get_cache_subdirectory(cache_dir, cache_key)
+    
+    # Try to find files in cache subdirectory
+    cached_paths: Dict[str, Path] = {}
+    for name, cached_path_str in cached_dataframes.items():
+        cached_path = Path(cached_path_str)
+        
+        # First, try to find file in cache subdirectory (most likely location)
+        file_name = cached_path.name
+        cache_file_path = cache_subdir / file_name
+        if cache_file_path.exists():
+            cached_paths[name] = cache_file_path
+        elif cached_path.is_absolute() and cached_path.exists():
+            # Fall back to absolute path if it exists
+            cached_paths[name] = cached_path
+        else:
+            # File not found
+            return None
+    
+    # Verify all files exist
+    if len(cached_paths) > 0 and all(path.exists() for path in cached_paths.values()):
+        return cached_paths
+    
+    return None
+
+
+def load_cached_dataframes(cache_dir: Path, cache_key: str) -> Optional[Dict[str, Any]]:
+    """
+    Load cached DataFrames from Parquet or CSV files.
+    
+    Parameters
+    ----------
+    cache_dir : Path
+        Cache directory
+    cache_key : str
+        Cache key
+    
+    Returns
+    -------
+    Optional[Dict[str, pd.DataFrame]]
+        Dictionary mapping DataFrame names to DataFrames if found, None otherwise
+    """
+    if not PANDAS_AVAILABLE:
+        return None
+    
+    cached_paths = get_cached_dataframe_files(cache_dir, cache_key)
+    if cached_paths is None:
+        return None
+    
+    dataframes: Dict[str, Any] = {}
+    for name, cached_path in cached_paths.items():
+        try:
+            # Try to load as Parquet first (faster, more efficient)
+            if cached_path.suffix == ".parquet":
+                df = pd.read_parquet(cached_path)
+            elif cached_path.suffix == ".csv":
+                df = pd.read_csv(cached_path)
+            else:
+                # Try Parquet first, fall back to CSV
+                parquet_path = cached_path.with_suffix(".parquet")
+                if parquet_path.exists():
+                    df = pd.read_parquet(parquet_path)
+                else:
+                    df = pd.read_csv(cached_path)
+            
+            dataframes[name] = df
+        except Exception as e:
+            # Failed to load cached DataFrame
+            return None
+    
+    return dataframes if dataframes else None
+
+
+def save_dataframes_to_cache(
+    cache_dir: Path,
+    cache_key: str,
+    dataframes: Dict[str, Any],
+    use_parquet: bool = True
+) -> Dict[str, Path]:
+    """
+    Save DataFrames to cache as Parquet or CSV files.
+    
+    Parameters
+    ----------
+    cache_dir : Path
+        Cache directory
+    cache_key : str
+        Cache key
+    dataframes : Dict[str, pd.DataFrame]
+        Dictionary mapping DataFrame names to DataFrames
+    use_parquet : bool, optional
+        Whether to use Parquet format (default: True, faster and more efficient)
+    
+    Returns
+    -------
+    Dict[str, Path]
+        Dictionary mapping DataFrame names to cached file paths
+    """
+    if not PANDAS_AVAILABLE:
+        return {}
+    
+    cache_subdir = get_cache_subdirectory(cache_dir, cache_key)
+    cached_paths: Dict[str, Path] = {}
+    
+    for name, df in dataframes.items():
+        if use_parquet:
+            cached_path = cache_subdir / f"{name}.parquet"
+            try:
+                df.to_parquet(cached_path, index=False, compression="snappy")
+            except Exception:
+                # Fall back to CSV if Parquet fails
+                cached_path = cache_subdir / f"{name}.csv"
+                df.to_csv(cached_path, index=False)
+        else:
+            cached_path = cache_subdir / f"{name}.csv"
+            df.to_csv(cached_path, index=False)
+        
+        cached_paths[name] = cached_path
+    
+    return cached_paths
 
