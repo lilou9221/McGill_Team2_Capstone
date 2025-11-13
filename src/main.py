@@ -114,8 +114,24 @@ def main():
         
         # Use cache for clipped rasters (enabled by default)
         # Pass processed_dir to get correct cache directory
-        from src.utils.cache import get_cache_dir
+        from src.utils.cache import get_cache_dir, cleanup_old_coordinate_caches
+        
         cache_dir = get_cache_dir(processed_dir, cache_type="clipped_rasters")
+        
+        # Collect source files for cache cleanup
+        raw_files = list(Path(raw_dir).glob("*.tif")) if Path(raw_dir).exists() else []
+        
+        # Clean up old coordinate-specific caches (preserves full state and protected coordinates)
+        removed_count = cleanup_old_coordinate_caches(
+            cache_dir=cache_dir,
+            current_lat=area.lat,
+            current_lon=area.lon,
+            current_radius_km=area.radius_km,
+            source_files=raw_files
+        )
+        if removed_count > 0:
+            print(f"\nCleaned up {removed_count} old coordinate-specific cache(s)")
+            print(f"  Preserved: Full state cache and protected coordinates (-13, -56, 100km)")
         
         clipped_files, cache_used = clip_all_rasters_to_circle(
             input_dir=raw_dir,

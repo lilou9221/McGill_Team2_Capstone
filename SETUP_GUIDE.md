@@ -237,7 +237,11 @@ The tool includes an intelligent caching system that significantly speeds up re-
 
 - **Location**: `data/processed/cache/`
 - **Size**: Typically 10-100 MB depending on area size and number of datasets
-- **Clearing**: Delete `data/processed/cache/` directory to force regeneration
+- **Automatic cleanup**: When new coordinates are provided, old coordinate-specific caches are automatically cleaned up
+  - Preserved caches: Full state cache and protected coordinates (-13, -56, 100km)
+  - Only coordinate-specific caches (clipped_rasters) are cleaned up
+  - A message is displayed showing how many old caches were cleaned up
+- **Manual clearing**: Delete `data/processed/cache/` directory to force regeneration of all caches
 - **Git ignore**: Cache files are excluded from Git (see `.gitignore`)
 
 ### Benefits
