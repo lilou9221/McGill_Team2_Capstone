@@ -83,11 +83,11 @@ def create_pydeck_map(
         }
     }
     
-    # Create deck
+    # Create deck with default Carto style background
+    # Using default map_style (Carto's dark style) to test if background shows
     deck = pdk.Deck(
         layers=[layer],
         initial_view_state=view_state,
-        map_style='mapbox://styles/mapbox/light-v9',
         tooltip=tooltip
     )
     

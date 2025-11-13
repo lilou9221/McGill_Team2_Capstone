@@ -64,8 +64,9 @@ pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml
 **Solution**:
 1. Run the acquisition tool: `python src/data/acquisition/gee_loader.py`
 2. When prompted, choose how many datasets to export (0 = all), review the task summary, and start the Drive tasks
-3. Wait for the exports (and automated downloads, if configured) to finish so GeoTIFFs appear in `data/raw/`
-4. Re-run the acquisition tool once exports complete; it will download any newly available rasters
+3. Wait for the exports to complete in Google Earth Engine
+4. **Automatic downloads**: Once Google Drive API is configured (see SETUP_GUIDE.md Step 4), files are automatically downloaded from Google Drive to `data/raw/` as export tasks complete. No manual step required.
+5. If downloads are not working automatically, re-run the acquisition tool once exports complete; it will automatically download any newly available rasters to `data/raw/`
 
 ### Final suitability CSV is empty
 

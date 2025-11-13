@@ -8,7 +8,7 @@ This tool analyzes soil properties (moisture, type, temperature, organic carbon,
 
 ## Features
 
-- **Automated Data Retrieval**: Launches parameterized Google Earth Engine exports with per-layer summaries and optional auto-start.
+- **Automated Data Retrieval**: Launches parameterized Google Earth Engine exports with per-layer summaries and optional auto-start. Downloads from Google Drive are automatic once configured.
 - **Targeted Spatial Analysis**: Works on the full Mato Grosso extent or user-specified circular AOIs with validation and graceful edge handling.
 - **Robust GeoTIFF Processing**: Clips, converts, and validates rasters before tabularisation, with an in-memory pandas pipeline and optional snapshots.
 - **H3 Hexagonal Grid**: Adds hex indexes and boundary geometry for efficient aggregation and map rendering.
@@ -69,7 +69,9 @@ pip install -r requirements.txt
      project_name: "your-project-name"
    ```
 
-### Step 5: Google Drive API Setup (for Automated Download)
+### Step 5: Google Drive API Setup (Required for Automatic Downloads)
+
+The tool automatically downloads exported GeoTIFF files from Google Drive once configured. Set up the Google Drive API to enable automatic downloads:
 
 1. **Enable Google Drive API:**
    - Go to [Google Cloud Console](https://console.cloud.google.com/)
@@ -82,8 +84,9 @@ pip install -r requirements.txt
    - Place it in `configs/client_secrets.json`
 
 3. **First-time authentication:**
-   - The first time you run the tool, it will open a browser for OAuth authentication
+   - The first time you run the acquisition tool, it will open a browser for OAuth authentication
    - A `credentials.json` file will be created automatically in `configs/`
+   - Once configured, all exported files will be automatically downloaded to `data/raw/`
 
 ## Configuration
 
@@ -110,7 +113,7 @@ python src/data/acquisition/gee_loader.py
 - Add `--start-tasks` to skip the confirmation prompt and immediately launch the Drive exports.
 - OpenLandMap layers (`soil_pH`, `soil_organic_carbon`, `soil_type`) are exported one GeoTIFF per depth band (`b0`, `b10`, `b30`, `b60`).
 
-After the Drive tasks complete (and downloads finish, if you use the automated downloader), the GeoTIFFs will be in `data/raw/`.
+**Automatic Downloads**: Once Google Drive API is configured (Step 5), exported files are automatically downloaded from Google Drive to `data/raw/` as soon as the GEE export tasks complete. No manual download step is required. The GeoTIFFs will appear in `data/raw/` automatically.
 
 ### 2. Process and Map
 
@@ -169,9 +172,9 @@ Verification helpers such as `verify_clipping_success`, `verify_clipped_data_int
 
 ## Workflow Summary
 
-1. **Data Retrieval**: Launch Drive exports from Google Earth Engine.
+1. **Data Retrieval**: Launch Drive exports from Google Earth Engine using `gee_loader.py`.
 2. **Task Review**: Inspect task summaries and start jobs with confidence.
-3. **Download**: Allow the automated Drive downloader (optional) to populate `data/raw/`.
+3. **Automatic Download**: Files are automatically downloaded from Google Drive to `data/raw/` as export tasks complete (requires Google Drive API setup from Step 5).
 4. **Processing**: Run `python src/main.py` with or without coordinates.
 5. **Score & Map**: Review the returned DataFrame (optionally written to `data/processed/suitability_scores.csv`) and `output/html/suitability_map.html`.
 6. **Validate (optional)**: Run the helper verification functions if you need to sanity-check inputs or radius coverage.
@@ -198,7 +201,8 @@ The tool generates:
 
 - **Re-authenticate GEE**: `python -c "import ee; ee.Authenticate()"`.
 - **Drive API hiccups**: confirm `configs/client_secrets.json` exists, delete `configs/credentials.json`, and re-run the acquisition tool.
-- **Missing rasters**: rerun `src/data/acquisition/gee_loader.py` and wait for Drive downloads to complete.
+- **Automatic downloads not working**: Ensure Google Drive API is enabled and `client_secrets.json` is properly configured. Downloads happen automatically once GEE export tasks complete.
+- **Missing rasters**: rerun `src/data/acquisition/gee_loader.py` and wait for automatic downloads to complete, or manually download from Google Drive if automatic download is not configured.
 - **Empty CSV outputs**: make sure the clipping circle overlaps the raster (edge circles often produce sparse data—use the verification helpers to confirm coverage).
 
 ## Contributing & Support

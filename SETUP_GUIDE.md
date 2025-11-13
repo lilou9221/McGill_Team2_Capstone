@@ -52,7 +52,9 @@ pip install -r requirements.txt
      project_name: "your-project-name"
    ```
 
-### 4. Google Drive API Setup (for Automated Download)
+### 4. Google Drive API Setup (Required for Automatic Downloads)
+
+The tool automatically downloads exported GeoTIFF files from Google Drive once configured. Set up the Google Drive API to enable automatic downloads:
 
 #### Step 4.1: Enable Google Drive API
 
@@ -86,11 +88,12 @@ pip install -r requirements.txt
    ```
 
 2. **First-time authentication:**
-   - When you first run the tool, it will automatically:
+   - When you first run the acquisition tool, it will automatically:
      - Open a browser for OAuth authentication
      - Create `configs/credentials.json` (stores your access token)
      - Create `configs/settings.yaml` (PyDrive configuration)
    - You only need to do this once
+   - Once configured, all exported files will be automatically downloaded to `data/raw/` as GEE export tasks complete
 
 #### Alternative: Manual PyDrive Setup
 
@@ -173,14 +176,15 @@ python -c "import ee; ee.Authenticate()"
 1. Go to Google Cloud Console
 2. Enable Google Drive API (see Step 4.1 above)
 
-### Issue: GeoTIFF files not downloading
+### Issue: GeoTIFF files not downloading automatically
 
 **Solution:**
 1. Check that export tasks completed in Google Earth Engine Code Editor
 2. Verify folder name matches in `config.yaml` (`gee.export_folder` and `drive.download_folder`)
 3. Check Google Drive for the exported files
-4. Verify Drive API credentials are correct
-5. Rerun `python src/data/acquisition/gee_loader.py`; once the script detects completed Drive exports it will download them to `data/raw/`
+4. Verify Drive API credentials are correct (`client_secrets.json` and `credentials.json`)
+5. Ensure Google Drive API is enabled in Google Cloud Console
+6. Downloads happen automatically once configured - rerun `python src/data/acquisition/gee_loader.py`; the script will automatically download any completed Drive exports to `data/raw/`
 
 ## Next Steps
 
