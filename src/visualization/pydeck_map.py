@@ -71,17 +71,32 @@ def create_pydeck_map(
     # Create tooltip
     # Note: PyDeck tooltips use {property} syntax, but format specifiers like .2f don't work
     # So we format the score in the data and use the formatted column
-    tooltip = {
-        'html': '''
-        <b>Suitability Score:</b> {suitability_score_formatted}<br>
-        <b>Location:</b> {lat_formatted}, {lon_formatted}<br>
-        <b>Points:</b> {point_count}
-        ''',
-        'style': {
-            'backgroundColor': 'white',
-            'color': 'black'
+    # Include H3 index in tooltip if using H3 hexagons
+    if has_h3:
+        tooltip = {
+            'html': '''
+            <b>Suitability Score:</b> {suitability_score_formatted}<br>
+            <b>H3 Index:</b> {h3_index}<br>
+            <b>Location:</b> {lat_formatted}, {lon_formatted}<br>
+            <b>Points:</b> {point_count}
+            ''',
+            'style': {
+                'backgroundColor': 'white',
+                'color': 'black'
+            }
         }
-    }
+    else:
+        tooltip = {
+            'html': '''
+            <b>Suitability Score:</b> {suitability_score_formatted}<br>
+            <b>Location:</b> {lat_formatted}, {lon_formatted}<br>
+            <b>Points:</b> {point_count}
+            ''',
+            'style': {
+                'backgroundColor': 'white',
+                'color': 'black'
+            }
+        }
     
     # Create deck with default Carto style background
     # Using default map_style (Carto's dark style) to test if background shows
