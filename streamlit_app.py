@@ -59,7 +59,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS - LIGHT THEME
+# Custom CSS - LIGHT THEME + READABLE LOG
 st.markdown("""
 <style>
     .main > div {padding-top: 2rem;}
@@ -113,6 +113,33 @@ st.markdown("""
     }
     .stDataFrame, .stTable {
         background-color: white;
+    }
+    /* Force dark text in code/log blocks */
+    .stCodeBlock, .stCode, code, pre {
+        color: #1a1a1a !important;
+        background-color: #f5f5f5 !important;
+        border: 1px solid #ddd !important;
+        border-radius: 6px !important;
+        padding: 0.5rem !important;
+        font-family: 'Courier New', monospace !important;
+    }
+    /* Improve expander content readability */
+    .streamlit-expanderContent {
+        color: #1a1a1a !important;
+    }
+    /* Optional: darker scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #5D7B6A;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #4A5F54;
     }
 </style>
 """, unsafe_allow_html=True)
