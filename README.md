@@ -14,7 +14,7 @@ This tool analyzes soil properties (moisture, type, temperature, organic carbon,
 - **Performance Caching**: Intelligent caching system speeds up re-runs by caching clipped rasters and DataFrame conversions. Automatically detects changes and invalidates cache when source files are updated.
 - **H3 Hexagonal Grid**: Adds hex indexes for efficient aggregation. Boundary geometry is generated after merge and aggregation to optimize memory usage (prevents memory crashes with large datasets).
 - **Suitability Scoring**: Applies configurable thresholds (0–10 scale) with per-property diagnostics prior to final rollups.
-- **Interactive Maps**: Generates PyDeck-based HTML visualisations and auto-opens them (configurable).
+- **Interactive Maps**: Generates PyDeck-based HTML visualisations with interactive tooltips showing suitability scores, H3 hexagon indexes, location coordinates, and point counts. Maps auto-open in browser (configurable).
 - **Auditable Workflow**: Each stage can be run independently, and helper utilities exist to verify intermediate results.
 
 ## Installation

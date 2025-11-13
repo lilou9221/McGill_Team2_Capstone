@@ -205,6 +205,8 @@ pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml pyar
 - Review the data in `data/processed/suitability_scores.csv`
 - Ensure the H3 resolution you selected matches what the visualisation expects (defaults to 7)
 
+**Note**: When using H3 hexagons, clicking or hovering over a hexagon displays a tooltip with the suitability score, H3 index, location coordinates, and point count.
+
 ### PYTHONPATH / import issues outside PyCharm
 
 **Problem**: Running scripts from PowerShell or Command Prompt raises `ModuleNotFoundError: No module named 'src...'`.
