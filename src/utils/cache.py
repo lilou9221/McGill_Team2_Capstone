@@ -316,6 +316,103 @@ def get_cache_subdirectory(cache_dir: Path, cache_key: str) -> Path:
     return cache_subdir
 
 
+def cleanup_old_coordinate_caches(
+    cache_dir: Path,
+    current_lat: float,
+    current_lon: float,
+    current_radius_km: float,
+    source_files: List[Path]
+) -> int:
+    """
+    Clean up old coordinate-specific caches, preserving protected caches.
+    
+    Protected caches:
+    - Full state cache (no coordinates)
+    - Specific coordinates (-13, -56, 100km)
+    
+    Parameters
+    ----------
+    cache_dir : Path
+        Cache directory to clean
+    current_lat : float
+        Current latitude (to preserve its cache)
+    current_lon : float
+        Current longitude (to preserve its cache)
+    current_radius_km : float
+        Current radius (to preserve its cache)
+    source_files : List[Path]
+        List of source files (to generate current cache key)
+    
+    Returns
+    -------
+    int
+        Number of cache entries removed
+    """
+    if not cache_dir.exists():
+        return 0
+    
+    # Protected coordinates: (-13, -56, 100km)
+    protected_lat = -13.0
+    protected_lon = -56.0
+    protected_radius = 100.0
+    
+    # Generate protected cache key
+    protected_cache_key = generate_cache_key(protected_lat, protected_lon, protected_radius, source_files)
+    
+    # Generate current cache key
+    current_cache_key = generate_cache_key(current_lat, current_lon, current_radius_km, source_files)
+    
+    # Load metadata for all caches to determine which have coordinates
+    removed_count = 0
+    for item in cache_dir.iterdir():
+        if not item.is_dir():
+            continue
+        
+        cache_key = item.name
+        # Skip current cache and protected cache
+        if cache_key == current_cache_key or cache_key == protected_cache_key:
+            continue
+        
+        # Check metadata to see if this is a coordinate-specific cache
+        metadata_path = get_cache_metadata_path(cache_dir, cache_key)
+        if not metadata_path.exists():
+            # No metadata - might be an old cache format, check if it's not the current one
+            continue
+        
+        try:
+            with open(metadata_path, "r") as f:
+                metadata = json.load(f)
+            
+            # Check if this cache has coordinates (is coordinate-specific)
+            if "lat" in metadata and "lon" in metadata and "radius_km" in metadata:
+                cache_lat = metadata["lat"]
+                cache_lon = metadata["lon"]
+                cache_radius = metadata["radius_km"]
+                
+                # Skip if this is the protected coordinates
+                if (round(cache_lat, 6) == round(protected_lat, 6) and 
+                    round(cache_lon, 6) == round(protected_lon, 6) and 
+                    round(cache_radius, 2) == round(protected_radius, 2)):
+                    continue
+                
+                # Skip if this is the current coordinates
+                if (round(cache_lat, 6) == round(current_lat, 6) and 
+                    round(cache_lon, 6) == round(current_lon, 6) and 
+                    round(cache_radius, 2) == round(current_radius_km, 2)):
+                    continue
+                
+                # This is an old coordinate-specific cache - remove it
+                import shutil
+                shutil.rmtree(item, ignore_errors=True)
+                metadata_path.unlink(missing_ok=True)
+                removed_count += 1
+        except (json.JSONDecodeError, KeyError, ValueError):
+            # Skip if metadata is invalid
+            continue
+    
+    return removed_count
+
+
 def clear_cache(cache_dir: Path, cache_key: Optional[str] = None) -> int:
     """
     Clear cache entries.
