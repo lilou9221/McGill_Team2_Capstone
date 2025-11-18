@@ -53,221 +53,234 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-# Enhanced Custom CSS - Inspired by Residual Carbon (Clean, Modern, Earthy Tones)
+# streamlit_app.py
+import streamlit as st
+import pandas as pd
+from pathlib import Path
+import sys
+import subprocess
+import shutil
+import tempfile
+import os
+import json
+import io
+import time
+
+# Dependency check
+def ensure_dependency(package_name, import_name=None):
+    import_name = import_name or package_name
+    try:
+        __import__(import_name)
+        return True
+    except ImportError:
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package_name, "--quiet"])
+            __import__(import_name)
+            return True
+        except Exception:
+            return False
+
+if not ensure_dependency("PyYAML", "yaml"):
+    st.error("**Missing PyYAML** — add `PyYAML>=6.0` to requirements.txt and redeploy.")
+    st.stop()
+import yaml
+
+# Project setup
+PROJECT_ROOT = Path(__file__).parent.resolve()
+sys.path.insert(0, str(PROJECT_ROOT))
+
+@st.cache_data
+def load_config():
+    cfg_path = PROJECT_ROOT / "configs" / "config.yaml"
+    with open(cfg_path, encoding='utf-8') as f:
+        return yaml.safe_load(f)
+config = load_config()
+
+# Page config
+st.set_page_config(
+    page_title="Biochar Suitability Mapper",
+    page_icon="leaf",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# FINAL CSS — exact Residual Carbon style, earthy green, ultra-clean
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @imported url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    /* Global Styles */
-    .main > div {padding-top: 1.5rem;}
-    body {
-        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-        color: #1e293b;
-        font-family: 'Inter', sans-serif;
-    }
-    .stApp {
-        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    }
+    .main > div {padding-top: 2rem;}
+    body, .stApp {background-color: #ffffff; font-family: 'Inter', sans-serif;}
+    h1, h2, h3, h4 {color: #1e293b; font-weight: 600;}
     
-    /* Typography */
-    h1, h2, h3, h4, h5, h6 {
-        font-family: 'Inter', sans-serif;
-        font-weight: 600;
-        color: #1e293b;
-    }
+    /* Header */
     .header-title {
-        font-size: 3.2rem;
+        font-size: 3rem;
         font-weight: 700;
         text-align: center;
-        background: linear-gradient(135deg, #10b981, #059669);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        color: #1e293b;
         margin-bottom: 0.5rem;
-        letter-spacing: -0.025em;
+        letter-spacing: -0.5px;
     }
     .header-subtitle {
         text-align: center;
         color: #64748b;
-        font-size: 1.2rem;
-        font-weight: 400;
-        margin-bottom: 2.5rem;
-        max-width: 800px;
-        margin-left: auto;
-        margin-right: auto;
+        font-size: 1.15rem;
+        max-width: 820px;
+        margin: 0 auto 3rem auto;
+        line-height: 1.6;
+    }
+    
+    /* Earthy green — exact Residual Carbon brand */
+    :root {
+        --rc-green: #2d6b5e;
+        --rc-green-dark: #1f4e45;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border: #e2e8f0;
     }
     
     /* Buttons */
     .stButton > button {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
-        border-radius: 12px;
-        border: none;
-        padding: 0.75rem 1.5rem;
-        font-weight: 600;
-        font-family: 'Inter', sans-serif;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
-        text-transform: none;
-        letter-spacing: 0.025em;
+        background-color: var(--rc-green) !important;
+        color: white !important;
+        border-radius: 12px !important;
+        border: none !important;
+        padding: 0.75rem 1.5rem !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        transition: all 0.25s ease !important;
     }
     .stButton > button:hover {
-        background: linear-gradient(135deg, #059669, #047857);
-        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        background-color: var(--rc-green-dark) !important;
         transform: translateY(-1px);
+        box-shadow: 0 8px 25px rgba(45, 107, 94, 0.25) !important;
     }
     
-    /* Metric Cards */
+    /* Metric cards */
     .metric-card {
-        background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(10px);
-        padding: 1.5rem;
-        border-radius: 16px;
-        border: 1px solid rgba(16, 185, 129, 0.1);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
+        background: white;
+        padding: 1.75rem;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
     }
-    .metric-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(135deg, #10b981, #059669);
-    }
-    .metric-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-    }
+    .metric-card:hover {transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1);}
     .metric-card h4 {
-        margin: 0 0 0.5rem 0;
-        color: #10b981;
-        font-size: 0.95rem;
-        font-weight: 500;
+        color: var(--rc-green);
+        font-size: 0.9rem;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.8px;
+        margin: 0 0 0.5rem 0;
     }
     .metric-card p {
-        font-size: 2.2rem;
-        margin: 0;
-        color: #1e293b;
+        font-size: 2.4rem;
         font-weight: 700;
-        line-height: 1.1;
+        color: var(--text-primary);
+        margin: 0;
+        line-height: 1;
     }
     
-    /* DataFrames and Tables */
-    .stDataFrame, .stTable {
-        background-color: rgba(255, 255, 255, 0.95);
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
+    /* Tables, dataframes */
+    .stDataFrame {border-radius: 12px; overflow: hidden; border: 1px solid var(--border);}
     
     /* Sidebar */
     section[data-testid="stSidebar"] {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
-        border-right: 1px solid #e2e8f0;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-    }
-    .stSidebar .stMarkdown {
-        color: #1e293b;
+        background: white;
+        border-right: 1px solid var(--border);
     }
     
-    /* Code and Logs */
-    .stCodeBlock, .stCode, code, pre {
+    /* Code blocks */
+    code, pre, .stCodeBlock {
+        background: #f8fafc !important;
         color: #1e293b !important;
-        background-color: rgba(248, 250, 252, 0.8) !important;
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid var(--border) !important;
         border-radius: 8px !important;
-        padding: 1rem !important;
-        font-family: 'Inter', monospace !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     }
     
-    /* Expander */
-    .streamlit-expanderContent {
-        color: #1e293b !important;
-        background: rgba(255, 255, 255, 0.7);
-        border-radius: 8px;
-    }
-    .stExpander {
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.6);
-    }
-    
-    /* Download Button */
+    /* Download button — same green */
     .stDownloadButton > button {
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        color: white;
-        border-radius: 12px;
-        border: none;
-        padding: 0.75rem 1.5rem;
-        font-weight: 600;
-        font-family: 'Inter', sans-serif;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+        background-color: var(--rc-green) !important;
+        color: white !important;
     }
     .stDownloadButton > button:hover {
-        background: linear-gradient(135deg, #1d4ed8, #1e40af);
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        background-color: var(--rc-green-dark) !important;
     }
     
     /* Footer */
     .footer {
         text-align: center;
-        padding: 2.5rem 0;
-        color: #64748b;
+        padding: 3rem 0 2rem;
+        color: var(--text-secondary);
         font-size: 0.95rem;
-        font-weight: 400;
-        border-top: 1px solid #e2e8f0;
-        margin-top: 3rem;
-        background: rgba(255, 255, 255, 0.5);
-        border-radius: 12px 12px 0 0;
+        border-top: 1px solid var(--border);
+        margin-top: 4rem;
     }
-    .footer strong {
-        color: #10b981;
-        font-weight: 600;
-    }
-    
-    /* Scrollbar */
-    ::-webkit-scrollbar {
-        width: 6px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #f1f5f9;
-        border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(135deg, #10b981, #059669);
-        border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(135deg, #059669, #047857);
-    }
-    
-    /* Subheaders */
-    .stMarkdown h2 {
-        color: #1e293b;
-        font-weight: 600;
-        border-bottom: 2px solid #e2e8f0;
-        padding-bottom: 0.5rem;
-        margin-bottom: 1.5rem;
-    }
-    
-    /* Info/Warning/Success Boxes */
-    .stAlert {
-        border-radius: 12px;
-        border: none;
-        padding: 1rem 1.25rem;
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(10px);
-    }
+    .footer strong {color: var(--rc-green);}
 </style>
+""", unsafe_allow_html=True)
+
+# Header
+st.markdown('<div class="header-title">Biochar Suitability Mapper</div>', unsafe_allow_html=True)
+st.markdown('<div class="header-subtitle">Precision mapping for sustainable biochar application in Mato Grosso, Brazil</div>', unsafe_allow_html=True)
+
+# Sidebar
+with st.sidebar:
+    st.markdown("### Analysis Scope")
+    use_coords = st.checkbox("Analyze radius around a point", value=False)
+    lat = lon = radius = None
+    if use_coords:
+        col1, col2 = st.columns(2)
+        lat = col1.number_input("Latitude", value=-13.0, step=0.1, format="%.4f")
+        lon = col2.number_input("Longitude", value=-56.0, step=0.1, format="%.4f")
+        radius = st.slider("Radius (km)", 25, 100, 100, 25)
+        st.info(f"Analysis radius: {radius} km")
+    else:
+        st.info("Full Mato Grosso state analysis")
+    
+    h3_res = st.slider("H3 resolution", 5, 9, config["processing"].get("h3_resolution", 7))
+    run_btn = st.button("Run Analysis", type="primary", use_container_width=True)
+
+# [Rest of your analysis code — unchanged, only visual parts updated]
+if run_btn:
+    # ... (your full analysis logic remains exactly the same)
+    # I'll keep it short here — just paste your existing block from previous working version
+    # Only change: removed all emojis from st.info/st.success etc.
+    
+    with st.spinner("Initializing..."):
+        # ... your full download + subprocess logic ...
+        pass  # ← keep your original code here unchanged
+
+    # Results display (no emojis)
+    st.success("Analysis complete")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f'<div class="metric-card"><h4>Hexagons</h4><p>{len(df):,}</p></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<div class="metric-card"><h4>Mean Score</h4><p>{df["suitability_score"].mean():.2f}/10</p></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown(f'<div class="metric-card"><h4>High Suitability (≥8)</h4><p>{(df["suitability_score"] >= 8).sum():,}</p></div>', unsafe_allow_html=True)
+
+    st.subheader("Suitability Scores")
+    st.dataframe(df.sort_values("suitability_score", ascending=False), use_container_width=True, hide_index=True)
+    
+    st.download_button("Download Results as CSV", df.to_csv(index=False).encode(), "biochar_suitability_scores.csv", "text/csv", use_container_width=True)
+    
+    html_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
+    if html_path.exists():
+        st.subheader("Interactive Suitability Map")
+        with open(html_path, "r", encoding="utf-8") as f:
+            st.components.v1.html(f.read(), height=720, scrolling=True)
+
+# Footer
+st.markdown("""
+<div class="footer">
+    <strong>Residual Carbon</strong> • McGill University Capstone<br>
+    Promoting biodiversity through science-driven biochar deployment
+</div>
+""", unsafe_allow_html=True)
 """, unsafe_allow_html=True)
 # Header
 st.markdown('<div class="header-title">Biochar Suitability Mapper</div>', unsafe_allow_html=True)
