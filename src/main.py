@@ -35,7 +35,7 @@ from src.utils.browser import open_html_in_browser
 def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
     """
     Ensure GeoTIFF rasters are available from the acquisition step.
-    Filters out old 3000m resolution files when 250m versions exist.
+    Filters out 3000m resolution files when 250m versions exist.
 
     Parameters
     ----------
@@ -62,12 +62,15 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
         )
 
     # Filter: Prefer 250m over 3000m resolution files
-    # Group files by dataset type (soil_moisture, soil_temp, etc.)
+    # Also prefer b0 (surface) over deeper layers (b10, b30, b60) for SOC, pH, soil_type
     tif_files = []
     excluded_files = []
     
     # Find all 250m files
     res_250_files = {f.name for f in all_tif_files if 'res_250' in f.name}
+    
+    # Find all b0 files for datasets with multiple depth layers
+    b0_files = {f.name for f in all_tif_files if '_b0' in f.name}
     
     for tif in all_tif_files:
         # If it's a 3000m file, check if a 250m version exists
@@ -78,6 +81,23 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
             if potential_250m_name in res_250_files:
                 excluded_files.append(tif)
                 continue  # Skip this 3000m file, use 250m version instead
+        
+        # For SOC, pH, and soil_type: prefer b0 over b10, b30, b60
+        # Check if this is a deeper layer file (b10, b30, b60)
+        if any(depth in tif.name for depth in ['_b10', '_b30', '_b60']):
+            # Check if this is SOC, pH, or soil_type
+            if any(dataset in tif.name.lower() for dataset in ['soc', 'ph', 'soil_type']):
+                # Check if corresponding b0 file exists
+                potential_b0_name = None
+                for depth in ['_b10', '_b30', '_b60']:
+                    if depth in tif.name:
+                        potential_b0_name = tif.name.replace(depth, '_b0')
+                        break
+                
+                if potential_b0_name and potential_b0_name in b0_files:
+                    excluded_files.append(tif)
+                    continue  # Skip this deeper layer file, use b0 instead
+        
         tif_files.append(tif)
     
     if not tif_files:
@@ -91,9 +111,18 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
         print(f"  - {tif.name}")
     
     if excluded_files:
-        print(f"\nExcluded {len(excluded_files)} old 3000m resolution file(s) (250m versions available):")
-        for tif in excluded_files:
-            print(f"  - {tif.name} (replaced by 250m version)")
+        excluded_3000m = [t for t in excluded_files if 'res_3000' in t.name]
+        excluded_deeper = [t for t in excluded_files if any(d in t.name for d in ['_b10', '_b30', '_b60'])]
+        
+        if excluded_3000m:
+            print(f"\nExcluded {len(excluded_3000m)} old 3000m resolution file(s) (250m versions available):")
+            for tif in excluded_3000m:
+                print(f"  - {tif.name} (replaced by 250m version)")
+        
+        if excluded_deeper:
+            print(f"\nExcluded {len(excluded_deeper)} deeper layer file(s) (using b0 surface layer instead):")
+            for tif in excluded_deeper:
+                print(f"  - {tif.name} (replaced by b0 surface layer)")
 
     return tif_files
 
@@ -122,11 +151,13 @@ def main():
     ensure_rasters_acquired(raw_dir)
 
     # Get area of interest (optional coordinates)
+    # Use non-interactive mode when running from command line (even if no coordinates provided)
+    # This will default to full state analysis
     area = get_user_area_of_interest(
         lat=args.lat,
         lon=args.lon,
         radius_km=args.radius,
-        interactive=(args.lat is None and args.lon is None)
+        interactive=False  # Always non-interactive when running from command line
     )
     
     # Step 1: Clip GeoTIFFs to circle (if coordinates provided)
@@ -168,7 +199,7 @@ def main():
                 print(f"\nCleaned up {removed_count} old coordinate-specific cache(s)")
                 print(f"  Preserved: Full state cache and protected coordinates (-13, -56, 100km)")
         
-        clipped_files, cache_used = clip_all_rasters_to_circle(
+        _, cache_used = clip_all_rasters_to_circle(
             input_dir=raw_dir,
             output_dir=tif_dir,
             circle_geometry=circle,
@@ -240,13 +271,17 @@ def main():
     
     # Save suitability scores CSV for Streamlit (with compatibility column name and scale)
     suitability_csv_path = processed_dir / "suitability_scores.csv"
-    # Create a copy with 'suitability_score' column for Streamlit compatibility
+    # Add 'suitability_score' column for Streamlit compatibility
     # Scale from 0-100 to 0-10 for Streamlit display
-    scored_df_for_csv = scored_df.copy()
-    if 'biochar_suitability_score' in scored_df_for_csv.columns:
-        # Scale from 0-100 to 0-10 for Streamlit (which expects 0-10 scale)
-        scored_df_for_csv['suitability_score'] = scored_df_for_csv['biochar_suitability_score'] / 10.0
+    # Use assign() to avoid full copy - only creates new column
+    if 'biochar_suitability_score' in scored_df.columns:
+        scored_df_for_csv = scored_df.assign(
+            suitability_score=scored_df['biochar_suitability_score'] / 10.0
+        )
+    else:
+        scored_df_for_csv = scored_df
     scored_df_for_csv.to_csv(suitability_csv_path, index=False)
+    del scored_df_for_csv  # Free memory immediately after saving
     print(f"\nSuitability scores saved to: {suitability_csv_path}")
     
     # Step 6: Output biochar suitability map
