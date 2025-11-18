@@ -70,6 +70,7 @@ processing:
   h3_resolution: 7  # H3 spatial index resolution (0-15, higher = finer hexagons)
   enable_clipping: true  # Enable spatial clipping workflow
   persist_snapshots: false  # Persist intermediate tables to CSV for debugging
+  cleanup_old_cache: true  # Automatically delete old coordinate-specific caches (preserves full state, protected coordinates, and current coordinates)
 
 # CSV column names
 csv:

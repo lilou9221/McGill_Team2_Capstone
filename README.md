@@ -252,9 +252,9 @@ The tool includes an intelligent caching system that significantly speeds up re-
 - Cache files are stored in `data/processed/cache/`
 - Cache directories are automatically created as needed
 - Cache files are excluded from Git (see `.gitignore`)
-- **Automatic cleanup**: When new coordinates are provided, old coordinate-specific caches are automatically cleaned up
-  - Preserved caches: Full state cache and protected coordinates (-13, -56, 100km)
-  - Only coordinate-specific caches (clipped_rasters) are cleaned up
+- **Automatic cleanup**: Old coordinate-specific caches are automatically cleaned up on each run
+  - Preserved caches: Full state cache (no coordinates), protected coordinates (-13, -56, 100km), and current coordinates (same lat/lon/radius as current run)
+  - Only old coordinate-specific caches (clipped_rasters) that don't match the above are removed
 - To manually clear cache: Delete the `data/processed/cache/` directory or specific cache subdirectories
 - Cache size: Typically 10-100 MB depending on area size and number of datasets
 
@@ -264,7 +264,7 @@ The tool includes an intelligent caching system that significantly speeds up re-
 - **Development speed**: Faster iteration when testing different parameters
 - **Resource efficiency**: Reduces CPU and I/O usage for repeated operations
 - **Automatic**: No manual configuration required, works out of the box
-- **Smart cleanup**: Automatically removes old coordinate-specific caches when new coordinates are provided, while preserving important caches (full state and protected coordinates)
+- **Smart cleanup**: Automatically removes old coordinate-specific caches on each run, while preserving important caches (full state, protected coordinates -13/-56/100km, and current coordinates)
 
 ## Memory Optimization
 

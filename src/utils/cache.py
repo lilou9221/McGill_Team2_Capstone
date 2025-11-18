@@ -331,9 +331,10 @@ def cleanup_old_coordinate_caches(
     """
     Clean up old coordinate-specific caches, preserving protected caches.
     
-    Protected caches:
-    - Full state cache (no coordinates)
-    - Specific coordinates (-13, -56, 100km)
+    Protected caches (always preserved):
+    - Full state cache (no coordinates in metadata - used when no coordinates provided)
+    - Protected coordinates (-13, -56, 100km) - always cached
+    - Current coordinates (the cache being used in this run)
     
     Parameters
     ----------
@@ -388,31 +389,36 @@ def cleanup_old_coordinate_caches(
             with open(metadata_path, "r") as f:
                 metadata = json.load(f)
             
-            # Check if this cache has coordinates (is coordinate-specific)
-            if "lat" in metadata and "lon" in metadata and "radius_km" in metadata:
-                cache_lat = metadata["lat"]
-                cache_lon = metadata["lon"]
-                cache_radius = metadata["radius_km"]
-                
-                # Skip if this is the protected coordinates
-                if (round(cache_lat, 6) == round(protected_lat, 6) and 
-                    round(cache_lon, 6) == round(protected_lon, 6) and 
-                    round(cache_radius, 2) == round(protected_radius, 2)):
-                    continue
-                
-                # Skip if this is the current coordinates
-                if (round(cache_lat, 6) == round(current_lat, 6) and 
-                    round(cache_lon, 6) == round(current_lon, 6) and 
-                    round(cache_radius, 2) == round(current_radius_km, 2)):
-                    continue
-                
-                # This is an old coordinate-specific cache - remove it
-                import shutil
-                shutil.rmtree(item, ignore_errors=True)
-                metadata_path.unlink(missing_ok=True)
-                removed_count += 1
+            # Preserve full state cache (no coordinates in metadata)
+            # Full state caches don't have lat/lon/radius_km, so they're automatically preserved
+            if "lat" not in metadata or "lon" not in metadata or "radius_km" not in metadata:
+                # This is a full state cache (no coordinates) - preserve it
+                continue
+            
+            # This cache has coordinates - check if it should be preserved
+            cache_lat = metadata["lat"]
+            cache_lon = metadata["lon"]
+            cache_radius = metadata["radius_km"]
+            
+            # Preserve protected coordinates (-13, -56, 100km)
+            if (round(cache_lat, 6) == round(protected_lat, 6) and 
+                round(cache_lon, 6) == round(protected_lon, 6) and 
+                round(cache_radius, 2) == round(protected_radius, 2)):
+                continue
+            
+            # Preserve current coordinates
+            if (round(cache_lat, 6) == round(current_lat, 6) and 
+                round(cache_lon, 6) == round(current_lon, 6) and 
+                round(cache_radius, 2) == round(current_radius_km, 2)):
+                continue
+            
+            # This is an old coordinate-specific cache - remove it
+            import shutil
+            shutil.rmtree(item, ignore_errors=True)
+            metadata_path.unlink(missing_ok=True)
+            removed_count += 1
         except (json.JSONDecodeError, KeyError, ValueError):
-            # Skip if metadata is invalid
+            # Skip if metadata is invalid (preserve it to be safe)
             continue
     
     return removed_count

@@ -159,10 +159,11 @@ pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml pyar
 - **First run**: Cache is created during normal processing (this is expected)
 - **Subsequent runs**: Cache is automatically used if valid (same inputs and parameters)
 - **Cache validation**: Cache automatically invalidates when source files change (checks modification times)
-- **Automatic cleanup**: Old coordinate-specific caches are automatically cleaned up when new coordinates are provided
-  - Protected caches (full state and -13, -56, 100km) are preserved
+- **Automatic cleanup**: Old coordinate-specific caches are automatically cleaned up on each run
+  - Protected caches: Full state cache (no coordinates), protected coordinates (-13, -56, 100km), and current coordinates (same lat/lon/radius as current run)
   - If you see "Cleaned up X old coordinate-specific cache(s)" message, this is normal behavior
-  - Only coordinate-specific caches (clipped_rasters) are cleaned up
+  - Only old coordinate-specific caches (clipped_rasters) that don't match the above are removed
+  - Can be disabled by setting `processing.cleanup_old_cache: false` in config
 - **Clear cache**: If you suspect cache issues, delete `data/processed/cache/` directory to force regeneration:
   ```bash
   # Windows
