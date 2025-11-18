@@ -67,12 +67,40 @@ DATASET_NATIVE_RESOLUTIONS = {
 DEFAULT_EXPORT_RESOLUTION = 250
 
 
-# Specific datasets that require per-band exports (depth levels)
-MULTI_BAND_EXPORTS = {
-    'soil_organic_carbon': ['b0', 'b10', 'b30', 'b60'],
-    'soil_pH': ['b0', 'b10', 'b30', 'b60'],
-    'soil_type': ['b0', 'b10', 'b30', 'b60'],
+# Datasets required for biochar suitability scoring
+SCORING_REQUIRED_DATASETS = {
+    'soil_moisture',      # Required for scoring
+    'soil_organic_carbon',  # Required for scoring (b0 and b10)
+    'soil_pH',            # Required for scoring (b0 and b10)
+    'soil_temperature',   # Required for scoring
 }
+
+# Optional datasets (not used in scoring but may be useful for visualization/analysis)
+OPTIONAL_DATASETS = {
+    'land_cover',  # Not used in scoring
+    'soil_type',   # Not used in scoring
+}
+
+# Specific datasets that require per-band exports (depth levels)
+# Only export b0 and b10 for SOC and pH (used in scoring)
+# soil_type is not used in scoring, so it's excluded from multi-band exports
+MULTI_BAND_EXPORTS = {
+    'soil_organic_carbon': ['b0', 'b10'],  # Only b0 and b10 used in scoring
+    'soil_pH': ['b0', 'b10'],  # Only b0 and b10 used in scoring
+    # Note: soil_type is not used in biochar suitability scoring
+}
+
+
+def get_scoring_required_datasets() -> List[str]:
+    """
+    Get list of datasets required for biochar suitability scoring.
+    
+    Returns
+    -------
+    List[str]
+        List of dataset names required for scoring
+    """
+    return list(SCORING_REQUIRED_DATASETS)
 
 
 def get_simplified_filename(dataset_name: str) -> str:
@@ -449,6 +477,8 @@ class GEEDataLoader:
             
             images_to_export = {name: image for name, image in images_to_export.items() if name in selected_layers}
             print(f"\nExporting {len(images_to_export)} of {len(self.images)} available layer(s)")
+        else:
+            print(f"\nExporting {len(images_to_export)} dataset(s) to Google Drive")
 
         # Get region geometry for export
         region = self.get_region_geometry()

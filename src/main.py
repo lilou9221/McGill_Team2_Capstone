@@ -35,7 +35,10 @@ from src.utils.browser import open_html_in_browser
 def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
     """
     Ensure GeoTIFF rasters are available from the acquisition step.
-    Filters out 3000m resolution files when 250m versions exist.
+    Filters to only scoring-required datasets and prefers 250m over 3000m resolution files.
+    
+    Note: All files are exported to Google Drive, but only scoring-required datasets
+    (soil_moisture, SOC b0/b10, pH b0/b10, soil_temperature) are imported for processing.
 
     Parameters
     ----------
@@ -45,7 +48,7 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
     Returns
     -------
     List[Path]
-        List of GeoTIFF files discovered in the raw directory (preferring 250m over 3000m).
+        List of GeoTIFF files discovered in the raw directory (only scoring-required datasets).
 
     Raises
     ------
@@ -61,8 +64,12 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
             "Run the acquisition step (data_loader.py) before processing."
         )
 
+    # Filter to only scoring-required datasets (not used: land_cover, soil_type)
+    from src.data.acquisition.gee_loader import get_scoring_required_datasets
+    scoring_datasets = get_scoring_required_datasets()
+    
     # Filter: Prefer 250m over 3000m resolution files
-    # Also prefer b0 (surface) over deeper layers (b10, b30, b60) for SOC, pH, soil_type
+    # For SOC and pH: include both b0 and b10 layers (used in scoring)
     tif_files = []
     excluded_files = []
     
@@ -73,6 +80,29 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
     b0_files = {f.name for f in all_tif_files if '_b0' in f.name}
     
     for tif in all_tif_files:
+        # First, filter out datasets not used in scoring (land_cover, soil_type)
+        tif_name_lower = tif.name.lower()
+        is_scoring_dataset = False
+        for dataset in scoring_datasets:
+            # Check if this file belongs to a scoring-required dataset
+            if dataset == 'soil_moisture' and 'moisture' in tif_name_lower and 'sm_surface' in tif_name_lower:
+                is_scoring_dataset = True
+                break
+            elif dataset == 'soil_organic_carbon' and ('soc' in tif_name_lower or 'soil_organic' in tif_name_lower):
+                is_scoring_dataset = True
+                break
+            elif dataset == 'soil_pH' and ('ph' in tif_name_lower or 'soil_ph' in tif_name_lower):
+                is_scoring_dataset = True
+                break
+            elif dataset == 'soil_temperature' and ('temp' in tif_name_lower or 'temperature' in tif_name_lower):
+                is_scoring_dataset = True
+                break
+        
+        # Skip files not used in scoring
+        if not is_scoring_dataset:
+            excluded_files.append(tif)
+            continue
+        
         # If it's a 3000m file, check if a 250m version exists
         if 'res_3000' in tif.name:
             # Check if corresponding 250m file exists
@@ -82,21 +112,19 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
                 excluded_files.append(tif)
                 continue  # Skip this 3000m file, use 250m version instead
         
-        # For SOC, pH, and soil_type: prefer b0 over b10, b30, b60
+        # For SOC and pH: include b0 and b10 (both used in scoring)
         # Check if this is a deeper layer file (b10, b30, b60)
         if any(depth in tif.name for depth in ['_b10', '_b30', '_b60']):
-            # Check if this is SOC, pH, or soil_type
-            if any(dataset in tif.name.lower() for dataset in ['soc', 'ph', 'soil_type']):
-                # Check if corresponding b0 file exists
-                potential_b0_name = None
-                for depth in ['_b10', '_b30', '_b60']:
-                    if depth in tif.name:
-                        potential_b0_name = tif.name.replace(depth, '_b0')
-                        break
-                
-                if potential_b0_name and potential_b0_name in b0_files:
+            # Check if this is SOC or pH - include b10, exclude b30 and b60
+            if any(dataset in tif.name.lower() for dataset in ['soc', 'ph']):
+                # Include b10 for SOC and pH
+                if '_b10' in tif.name:
+                    tif_files.append(tif)
+                    continue
+                # Exclude b30 and b60 for SOC and pH (only use b0 and b10)
+                elif any(depth in tif.name for depth in ['_b30', '_b60']):
                     excluded_files.append(tif)
-                    continue  # Skip this deeper layer file, use b0 instead
+                    continue
         
         tif_files.append(tif)
     
@@ -111,8 +139,14 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
         print(f"  - {tif.name}")
     
     if excluded_files:
-        excluded_3000m = [t for t in excluded_files if 'res_3000' in t.name]
-        excluded_deeper = [t for t in excluded_files if any(d in t.name for d in ['_b10', '_b30', '_b60'])]
+        excluded_non_scoring = [t for t in excluded_files if not any(d in t.name.lower() for d in ['soc', 'ph', 'moisture', 'temp', 'temperature'])]
+        excluded_3000m = [t for t in excluded_files if 'res_3000' in t.name and t not in excluded_non_scoring]
+        excluded_deeper = [t for t in excluded_files if any(d in t.name for d in ['_b30', '_b60']) and t not in excluded_non_scoring]
+        
+        if excluded_non_scoring:
+            print(f"\nExcluded {len(excluded_non_scoring)} dataset(s) not used in scoring (available in Google Drive but not imported for processing):")
+            for tif in excluded_non_scoring:
+                print(f"  - {tif.name} (not used in biochar suitability scoring)")
         
         if excluded_3000m:
             print(f"\nExcluded {len(excluded_3000m)} old 3000m resolution file(s) (250m versions available):")
@@ -120,9 +154,11 @@ def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
                 print(f"  - {tif.name} (replaced by 250m version)")
         
         if excluded_deeper:
-            print(f"\nExcluded {len(excluded_deeper)} deeper layer file(s) (using b0 surface layer instead):")
+            print(f"\nExcluded {len(excluded_deeper)} deeper layer file(s):")
             for tif in excluded_deeper:
-                print(f"  - {tif.name} (replaced by b0 surface layer)")
+                if any(d in tif.name for d in ['_b30', '_b60']):
+                    if any(d in tif.name.lower() for d in ['soc', 'ph']):
+                        print(f"  - {tif.name} (using b0 and b10 layers instead)")
 
     return tif_files
 
@@ -147,8 +183,8 @@ def main():
     output_dir = project_root / config.get("output", {}).get("html", "output/html")
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Ensure acquisition step completed before prompting for coordinates
-    ensure_rasters_acquired(raw_dir)
+    # Ensure acquisition step completed and get filtered file list (only scoring-required)
+    filtered_tif_files = ensure_rasters_acquired(raw_dir)
 
     # Get area of interest (optional coordinates)
     # Use non-interactive mode when running from command line (even if no coordinates provided)
@@ -199,8 +235,14 @@ def main():
                 print(f"\nCleaned up {removed_count} old coordinate-specific cache(s)")
                 print(f"  Preserved: Full state cache and protected coordinates (-13, -56, 100km)")
         
+        # Create a temporary directory with only scoring-required files for clipping
+        # This ensures only the filtered files are processed
+        filtered_input_dir = Path(tempfile.mkdtemp(prefix="residual_carbon_filtered_"))
+        for tif_file in filtered_tif_files:
+            shutil.copy2(tif_file, filtered_input_dir / tif_file.name)
+        
         _, cache_used = clip_all_rasters_to_circle(
-            input_dir=raw_dir,
+            input_dir=filtered_input_dir,
             output_dir=tif_dir,
             circle_geometry=circle,
             use_cache=True,
@@ -209,6 +251,9 @@ def main():
             lon=area.lon,
             radius_km=area.radius_km
         )
+        
+        # Clean up temporary filtered directory
+        shutil.rmtree(filtered_input_dir, ignore_errors=True)
         
         if cache_used:
             print("  Using cached clipped rasters - skipping clipping step")

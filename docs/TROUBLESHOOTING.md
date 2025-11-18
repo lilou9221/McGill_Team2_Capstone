@@ -42,8 +42,10 @@ pip install -e .
 
 Or install specific packages:
 ```bash
-pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml pyarrow
+pip install earthengine-api rasterio pandas h3 pydeck shapely pyyaml pyarrow
 ```
+
+**Note**: `folium` is listed in `requirements.txt` for Streamlit compatibility but is not used in the main pipeline (which uses PyDeck exclusively).
 
 **Note**: `pyarrow>=10.0.0` is required for DataFrame caching (Parquet file support). This is automatically installed via `requirements.txt`, but if you encounter Parquet-related errors, ensure it's installed: `pip install pyarrow>=10.0.0`.
 
@@ -70,6 +72,8 @@ pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml pyar
 4. **Automatic downloads**: Once Google Drive API is configured (see SETUP_GUIDE.md Step 4), files are automatically downloaded from Google Drive to `data/raw/` as export tasks complete. No manual step required.
 5. If downloads are not working automatically, re-run the acquisition tool once exports complete; it will automatically download any newly available rasters to `data/raw/`
 6. SMAP rasters should appear with `_res_250_...` filenames (e.g., `soil_moisture_res_250_sm_surface.tif`). The pipeline automatically filters out any old `_res_3000_...` files when 250m versions exist, so you can safely keep both in `data/raw/` - only the 250m versions will be used.
+7. **Dataset filtering**: Only scoring-required datasets are imported for processing. Files like `land_cover_res_250_Map.tif` and `soil_type_res_250_b0.tif` will be in `data/raw/` (exported to Google Drive) but are automatically excluded from processing. This is expected behavior - only scoring-required files (soil_moisture, SOC b0/b10, pH b0/b10, soil_temperature) are processed.
+8. **Depth layers**: For SOC and pH, ensure both `*_b0.tif` and `*_b10.tif` files are present. The system averages both layers for more accurate scoring. Deeper layers (b30, b60) are not needed.
 
 ### Final merged data CSV is empty
 
@@ -90,8 +94,11 @@ pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml pyar
 - Verify the in-memory tables contain the required soil property columns (moisture, SOC, pH, temperature)
 - Check that property values are within expected ranges
 - Ensure SOC and pH values are present (these are required for biochar suitability calculation)
+  - **Note**: The system uses both b0 (surface) and b10 (10cm depth) layers for SOC and pH, averaging them when both are available
+  - If only one layer is available, it will use that layer
 - Check that moisture and temperature have valid values or will use default values (50% moisture, 20°C temperature)
 - Inspect the biochar suitability score columns to see which properties might be causing issues
+- Verify that b0 and b10 files are present in `data/raw/` for SOC and pH datasets
 
 ## Configuration Issues
 
