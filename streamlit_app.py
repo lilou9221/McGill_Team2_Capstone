@@ -10,7 +10,6 @@ import os
 import json
 import io
 import time
-
 # Check for required dependencies and install if missing (for Streamlit Cloud)
 def ensure_dependency(package_name, import_name=None):
     """Ensure a Python package is installed, try to install if missing."""
@@ -27,7 +26,6 @@ def ensure_dependency(package_name, import_name=None):
             return True
         except Exception:
             return False
-
 # Check for PyYAML
 if not ensure_dependency("PyYAML", "yaml"):
     st.error(
@@ -38,11 +36,9 @@ if not ensure_dependency("PyYAML", "yaml"):
     )
     st.stop()
 import yaml
-
 # Project setup
 PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
-
 # Load config
 @st.cache_data
 def load_config():
@@ -50,107 +46,235 @@ def load_config():
     with open(cfg_path, encoding='utf-8') as f:
         return yaml.safe_load(f)
 config = load_config()
-
 # Page config
 st.set_page_config(
     page_title="Biochar Suitability Mapper",
-    page_icon="leaf",
+    page_icon="🌿",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Custom CSS - LIGHT THEME + READABLE LOG
+# Enhanced Custom CSS - Inspired by Residual Carbon (Clean, Modern, Earthy Tones)
 st.markdown("""
 <style>
-    .main > div {padding-top: 2rem;}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* Global Styles */
+    .main > div {padding-top: 1.5rem;}
     body {
-        background-color: #ffffff;
-        color: #333333;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        color: #1e293b;
+        font-family: 'Inter', sans-serif;
     }
     .stApp {
-        background-color: #ffffff;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     }
-    .stButton > button {
-        background-color: #5D7B6A;
-        color: white;
-        border-radius: 8px;
-        border: none;
-        padding: 0.6rem 1.2rem;
+    
+    /* Typography */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Inter', sans-serif;
         font-weight: 600;
-        transition: all 0.3s;
-    }
-    .stButton > button:hover {
-        background-color: #4A5F54;
-        box-shadow: 0 4px 8px rgba(93,123,106,0.3);
-    }
-    .metric-card {
-        background-color: #f8f9fa;
-        padding: 1.2rem;
-        border-radius: 12px;
-        border-left: 4px solid #5D7B6A;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        color: #1e293b;
     }
     .header-title {
-        font-size: 2.8rem;
+        font-size: 3.2rem;
         font-weight: 700;
         text-align: center;
-        color: #2d3a3a;
+        background: linear-gradient(135deg, #10b981, #059669);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         margin-bottom: 0.5rem;
+        letter-spacing: -0.025em;
     }
     .header-subtitle {
         text-align: center;
-        color: #6c757d;
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
+        color: #64748b;
+        font-size: 1.2rem;
+        font-weight: 400;
+        margin-bottom: 2.5rem;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
     }
+    
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border-radius: 12px;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+        text-transform: none;
+        letter-spacing: 0.025em;
+    }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        transform: translateY(-1px);
+    }
+    
+    /* Metric Cards */
+    .metric-card {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        padding: 1.5rem;
+        border-radius: 16px;
+        border: 1px solid rgba(16, 185, 129, 0.1);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(135deg, #10b981, #059669);
+    }
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    }
+    .metric-card h4 {
+        margin: 0 0 0.5rem 0;
+        color: #10b981;
+        font-size: 0.95rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .metric-card p {
+        font-size: 2.2rem;
+        margin: 0;
+        color: #1e293b;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    
+    /* DataFrames and Tables */
+    .stDataFrame, .stTable {
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-right: 1px solid #e2e8f0;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+    }
+    .stSidebar .stMarkdown {
+        color: #1e293b;
+    }
+    
+    /* Code and Logs */
+    .stCodeBlock, .stCode, code, pre {
+        color: #1e293b !important;
+        background-color: rgba(248, 250, 252, 0.8) !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        padding: 1rem !important;
+        font-family: 'Inter', monospace !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Expander */
+    .streamlit-expanderContent {
+        color: #1e293b !important;
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 8px;
+    }
+    .stExpander {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.6);
+    }
+    
+    /* Download Button */
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: white;
+        border-radius: 12px;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+    }
+    .stDownloadButton > button:hover {
+        background: linear-gradient(135deg, #1d4ed8, #1e40af);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+    
+    /* Footer */
     .footer {
         text-align: center;
-        padding: 2rem 0;
-        color: #6c757d;
-        font-size: 0.9rem;
-        border-top: 1px solid #dee2e6;
+        padding: 2.5rem 0;
+        color: #64748b;
+        font-size: 0.95rem;
+        font-weight: 400;
+        border-top: 1px solid #e2e8f0;
         margin-top: 3rem;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 12px 12px 0 0;
     }
-    .stDataFrame, .stTable {
-        background-color: white;
+    .footer strong {
+        color: #10b981;
+        font-weight: 600;
     }
-    /* Force dark text in code/log blocks */
-    .stCodeBlock, .stCode, code, pre {
-        color: #1a1a1a !important;
-        background-color: #f5f5f5 !important;
-        border: 1px solid #ddd !important;
-        border-radius: 6px !important;
-        padding: 0.5rem !important;
-        font-family: 'Courier New', monospace !important;
-    }
-    /* Improve expander content readability */
-    .streamlit-expanderContent {
-        color: #1a1a1a !important;
-    }
-    /* Optional: darker scrollbar */
+    
+    /* Scrollbar */
     ::-webkit-scrollbar {
-        width: 8px;
+        width: 6px;
     }
     ::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: #f1f5f9;
+        border-radius: 3px;
     }
     ::-webkit-scrollbar-thumb {
-        background: #5D7B6A;
-        border-radius: 4px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        border-radius: 3px;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #4A5F54;
+        background: linear-gradient(135deg, #059669, #047857);
+    }
+    
+    /* Subheaders */
+    .stMarkdown h2 {
+        color: #1e293b;
+        font-weight: 600;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Info/Warning/Success Boxes */
+    .stAlert {
+        border-radius: 12px;
+        border: none;
+        padding: 1rem 1.25rem;
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
     }
 </style>
 """, unsafe_allow_html=True)
-
 # Header
 st.markdown('<div class="header-title">Biochar Suitability Mapper</div>', unsafe_allow_html=True)
 st.markdown('<div class="header-subtitle">Precision mapping for sustainable biochar application in Mato Grosso, Brazil</div>', unsafe_allow_html=True)
-
 # Sidebar
 with st.sidebar:
-    st.markdown("### Analysis Scope")
+    st.markdown("### 🌍 Analysis Scope")
     use_coords = st.checkbox("Analyze radius around a point", value=False)
     lat = lon = radius = None
     if use_coords:
@@ -162,15 +286,13 @@ with st.sidebar:
     else:
         st.info("Full **Mato Grosso state** analysis")
     h3_res = st.slider("H3 resolution", 5, 9, config["processing"].get("h3_resolution", 7))
-    run_btn = st.button("Run Analysis", type="primary", use_container_width=True)
-
+    run_btn = st.button("🚀 Run Analysis", type="primary", use_container_width=True)
 # Run analysis
 if run_btn:
     with st.spinner("Initializing..."):
         tmp_raw = Path(tempfile.mkdtemp(prefix="rc_raw_"))
         raw_dir = PROJECT_ROOT / config["data"]["raw"]
         raw_dir.mkdir(parents=True, exist_ok=True)
-
         # Check if GeoTIFFs are already cached
         if raw_dir.exists() and len(list(raw_dir.glob("*.tif"))) >= 5:
             st.info("Using cached GeoTIFFs")
@@ -181,7 +303,6 @@ if run_btn:
                 from google.oauth2 import service_account
                 from googleapiclient.discovery import build
                 from googleapiclient.http import MediaIoBaseDownload
-
                 creds_info = json.loads(st.secrets["google_drive"]["credentials"])
                 credentials = service_account.Credentials.from_service_account_info(
                     creds_info, scopes=['https://www.googleapis.com/auth/drive.readonly']
@@ -194,11 +315,9 @@ if run_btn:
                 ).execute()
                 files = results.get('files', [])
                 tif_files = [f for f in files if f['name'].endswith('.tif')]
-
                 if not tif_files:
                     st.error("No .tif files found in Drive folder.")
                     st.stop()
-
                 for file in tif_files:
                     filepath = raw_dir / file['name']
                     if not filepath.exists():
@@ -219,7 +338,6 @@ if run_btn:
             except Exception as e:
                 st.error(f"Drive download failed: {e}")
                 st.stop()
-
         # === RUN MAIN PIPELINE ===
         wrapper_script = PROJECT_ROOT / "run_analysis.py"
         cli = [
@@ -229,13 +347,10 @@ if run_btn:
         ]
         if lat and lon and radius:
             cli += ["--lat", str(lat), "--lon", str(lon), "--radius", str(radius)]
-
         status_container = st.empty()
         log_container = st.empty()
-
         with status_container.container():
             st.info("Starting analysis pipeline... This may take 2-5 minutes.")
-
         proc = subprocess.Popen(
             cli,
             cwd=PROJECT_ROOT,
@@ -250,12 +365,10 @@ if run_btn:
             },
             universal_newlines=True
         )
-
         output_lines = []
         last_update = 0
         update_interval = 0.5
         start_time = time.time()
-
         while True:
             line = proc.stdout.readline()
             if not line:
@@ -263,37 +376,28 @@ if run_btn:
                     break
                 time.sleep(0.1)
                 continue
-
             output_lines.append(line)
             current_time = time.time()
-
             if current_time - last_update > update_interval:
                 elapsed = int(current_time - start_time)
                 with status_container.container():
                     st.info(f"Running... ({elapsed}s elapsed)")
-
                 recent_lines = output_lines[-10:] if len(output_lines) > 10 else output_lines
                 with log_container.expander("View progress log", expanded=False):
                     st.code("".join(recent_lines))
-
                 last_update = current_time
-
         remaining_output, _ = proc.communicate()
         if remaining_output:
             output_lines.append(remaining_output)
-
         returncode = proc.returncode
         full_output = "".join(output_lines)
         elapsed_total = int(time.time() - start_time)
-
         with status_container.container():
             if returncode == 0:
                 st.success(f"Analysis completed successfully! ({elapsed_total}s)")
             else:
                 st.error(f"Analysis failed after {elapsed_total}s")
-
         shutil.rmtree(tmp_raw, ignore_errors=True)
-
         if returncode != 0:
             st.error("Analysis failed")
             if "ModuleNotFoundError" in full_output and "yaml" in full_output.lower():
@@ -307,61 +411,54 @@ if run_btn:
             with st.expander("View error log"):
                 st.code(full_output)
             st.stop()
-
     # === DISPLAY RESULTS ===
     csv_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
     if not csv_path.exists():
         st.error("Results not generated.")
         st.stop()
-
     df = pd.read_csv(csv_path)
     st.success("Analysis complete!")
-
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f'''
         <div class="metric-card">
-            <h4 style="margin:0;color:#5D7B6A">Hexagons</h4>
-            <p style="font-size:1.8rem;margin:0.4rem 0;color:#2d3a3a">{len(df):,}</p>
+            <h4>Hexagons</h4>
+            <p>{len(df):,}</p>
         </div>
         ''', unsafe_allow_html=True)
     with col2:
         mean = df['suitability_score'].mean()
         st.markdown(f'''
         <div class="metric-card">
-            <h4 style="margin:0;color:#5D7B6A">Mean Score</h4>
-            <p style="font-size:1.8rem;margin:0.4rem 0;color:#2d3a3a">{mean:.2f}/10</p>
+            <h4>Mean Score</h4>
+            <p>{mean:.2f}/10</p>
         </div>
         ''', unsafe_allow_html=True)
     with col3:
         high = (df['suitability_score'] >= 8).sum()
         st.markdown(f'''
         <div class="metric-card">
-            <h4 style="margin:0;color:#5D7B6A">High Suitability</h4>
-            <p style="font-size:1.8rem;margin:0.4rem 0;color:#2d3a3a">{high:,}</p>
+            <h4>High Suitability</h4>
+            <p>{high:,}</p>
         </div>
         ''', unsafe_allow_html=True)
-
-    st.subheader("Suitability Scores")
+    st.subheader("📊 Suitability Scores")
     st.dataframe(df.sort_values("suitability_score", ascending=False), use_container_width=True, hide_index=True)
-
     csv_data = df.to_csv(index=False).encode()
     st.download_button(
-        "Download CSV",
+        "📥 Download CSV",
         csv_data,
         "biochar_suitability_scores.csv",
         "text/csv",
         use_container_width=True
     )
-
     html_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
     if html_path.exists():
-        st.subheader("Interactive Suitability Map")
+        st.subheader("🗺️ Interactive Suitability Map")
         with open(html_path, "r", encoding="utf-8") as f:
             st.components.v1.html(f.read(), height=700, scrolling=True)
     else:
         st.warning("Map not generated.")
-
 # Footer
 st.markdown("""
 <div class="footer">
