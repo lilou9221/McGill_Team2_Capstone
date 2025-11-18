@@ -116,18 +116,114 @@ with st.sidebar:
     run_btn = st.button("Run Analysis", type="primary", use_container_width=True)
 
 # ============================================================
-# MAIN PIPELINE (your original code – untouched)
+# MAIN ANALYSIS PIPELINE
 # ============================================================
 if run_btn:
-    # ← Paste your full analysis block exactly as you had it before
-    # (downloads, subprocess, results loading, etc.)
-    # I kept it out here for brevity, but it stays 100% the same
-    pass
+    with st.spinner("Preparing data…"):
+        tmp_raw = Path(tempfile.mkdtemp(prefix="rc_raw_"))
+        raw_dir = PROJECT_ROOT / config["data"]["raw"]
+        raw_dir.mkdir(parents=True, exist_ok=True)
 
-    # Example results section (replace with your real one)
-    df = pd.DataFrame({"suitability_score": [8.5, 7.2, 9.1]})  # placeholder
+        # Check if GeoTIFFs are already downloaded
+        if len(list(raw_dir.glob("*.tif"))) >= 5:
+            shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
+        else:
+            st.warning("Downloading GeoTIFFs from Google Drive…")
+
+            try:
+                from google.oauth2 import service_account
+                from googleapiclient.discovery import build
+                from googleapiclient.http import MediaIoBaseDownload
+
+                creds = json.loads(st.secrets["google_drive"]["credentials"])
+                credentials = service_account.Credentials.from_service_account_info(
+                    creds,
+                    scopes=["https://www.googleapis.com/auth/drive.readonly"]
+                )
+                service = build("drive", "v3", credentials=credentials)
+
+                folder_id = config["drive"]["raw_data_folder_id"]
+                results = service.files().list(
+                    q=f"'{folder_id}' in parents and trashed=false",
+                    fields="files(id, name)"
+                ).execute()
+
+                for f in results["files"]:
+                    if not f["name"].endswith(".tif"):
+                        continue
+
+                    dst = raw_dir / f["name"]
+                    if dst.exists():
+                        continue
+
+                    request = service.files().get_media(fileId=f["id"])
+                    fh = io.BytesIO()
+                    downloader = MediaIoBaseDownload(fh, request)
+                    done = False
+                    while not done:
+                        _, done = downloader.next_chunk()
+
+                    with open(dst, "wb") as fp:
+                        fp.write(fh.getvalue())
+
+                shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
+
+            except Exception as e:
+                st.error(f"Download failed: {e}")
+                st.error(f"TIFF download failed: {e}")
+                st.stop()
+
+    # Build CLI for pipeline
+    wrapper_script = PROJECT_ROOT / "scripts" / "run_analysis.py"
+    cli = [
+        sys.executable, str(wrapper_script),
+        "--config", str(PROJECT_ROOT / "configs" / "config.yaml"),
+        "--h3-resolution", str(h3_res),
+    ]
+    if use_coords and lat is not None and lon is not None and radius is not None:
+        cli += ["--lat", str(lat), "--lon", str(lon), "--radius", str(radius)]
+
+    status = st.empty()
+    log_box = st.empty()
+    logs = []
+
+    process = subprocess.Popen(
+        cli,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        universal_newlines=True,
+        bufsize=1
+    )
+
+    start = time.time()
+    for line in process.stdout:
+        logs.append(line)
+        status.info(f"Running… {int(time.time()-start)}s elapsed")
+        log_box.code("".join(logs[-12:]), language="bash")
+
+    ret = process.wait()
+
+    if ret != 0:
+        st.error("Pipeline failed.")
+        st.code("".join(logs), language="bash")
+        st.stop()
+
+    # ============================================================
+    # LOAD RESULTS
+    # ============================================================
+    csv_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
+    if not csv_path.exists():
+        st.error("Results CSV missing.")
+        st.error("Results missing.")
+        st.stop()
+
+    df = pd.read_csv(csv_path)
     st.success("Analysis completed successfully!")
 
+    # ============================================================
+    # METRICS
+    # ============================================================
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f'<div class="metric-card"><h4>Total Hexagons</h4><p>{len(df):,}</p></div>', unsafe_allow_html=True)
@@ -136,6 +232,9 @@ if run_btn:
     with col3:
         st.markdown(f'<div class="metric-card"><h4>High Suitability (≥8)</h4><p>{(df["suitability_score"] >= 8).sum():,}</p></div>', unsafe_allow_html=True)
 
+    # ============================================================
+    # TABLE
+    # ============================================================
     st.subheader("Suitability Scores")
     st.dataframe(df.sort_values("suitability_score", ascending=False), use_container_width=True)
 
@@ -146,6 +245,16 @@ if run_btn:
         mime="text/csv",
         use_container_width=True
     )
+
+    # ============================================================
+    # MAP
+    # ============================================================
+    map_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
+    if map_path.exists():
+        st.subheader("Interactive Map")
+        st.components.v1.html(open(map_path, "r", encoding="utf-8").read(), height=720)
+    else:
+        st.warning("Map not generated.")
 
 # ============================================================
 # FOOTER
