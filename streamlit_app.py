@@ -11,256 +11,173 @@ import json
 import io
 import time
 
-# === Dependency check ===
+# Check for required dependencies and install if missing (for Streamlit Cloud)
 def ensure_dependency(package_name, import_name=None):
+    """Ensure a Python package is installed, try to install if missing."""
     import_name = import_name or package_name
     try:
         __import__(import_name)
         return True
     except ImportError:
         try:
-            subprocess.check_call(
-                [sys.executable, "-m", "pip", "install", package_name, "--quiet"]
-            )
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install", package_name, "--quiet"
+            ])
             __import__(import_name)
             return True
         except Exception:
             return False
 
+# Check for PyYAML
 if not ensure_dependency("PyYAML", "yaml"):
-    st.error("Missing dependency: PyYAML. Add PyYAML>=6.0 to requirements.txt.")
+    st.error(
+        "**Missing Dependency: PyYAML**\n\n"
+        "PyYAML could not be installed automatically. Please ensure it's in requirements.txt:\n\n"
+        "```txt\nPyYAML>=6.0\n```\n\n"
+        "For Streamlit Cloud, restart your deployment after updating requirements.txt."
+    )
     st.stop()
-
 import yaml
 
-# === Project setup ===
+# Project setup
 PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Load config
 @st.cache_data
 def load_config():
     cfg_path = PROJECT_ROOT / "configs" / "config.yaml"
-    with open(cfg_path, "r", encoding="utf-8") as f:
+    with open(cfg_path, encoding='utf-8') as f:
         return yaml.safe_load(f)
-
 config = load_config()
 
-# === Page config ===
+# Page config
 st.set_page_config(
     page_title="Biochar Suitability Mapper",
-    page_icon="🌱",
+    page_icon="leaf",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded"
 )
 
-# === COMPLETE DASHBOARD CSS (GREEN / PURPLE / WHITE) ===
-st.markdown(
-    """
+# Custom CSS - LIGHT THEME
+# Custom CSS - LIGHT THEME + READABLE LOG
+st.markdown("""
 <style>
-
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    :root {
-        --green: #234F38;
-        --purple: #6A4E77;
-        --text: #111827;
-        --muted: #6B7280;
-        --border: #E5E7EB;
-        --bg: #F7F8FA;
-        --white: #FFFFFF;
+    .main > div {padding-top: 2rem;}
+    body {
+        background-color: #ffffff;
+        color: #333333;
     }
-
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-
     .stApp {
-        background-color: var(--bg);
+        background-color: #ffffff;
     }
-
-    /* MAIN CONTAINER WIDTH */
-    .main .block-container {
-        max-width: 1180px;
-        margin: 0 auto;
-        padding-top: 1.5rem;
-    }
-
-    /* ---------------------- HEADER ---------------------- */
-    .rc-header {
-        margin-bottom: 1.8rem;
-    }
-    .rc-header-kicker {
-        text-transform: uppercase;
-        font-size: 0.8rem;
-        letter-spacing: .15em;
-        font-weight: 600;
-        color: var(--purple);
-        margin-bottom: 0.1rem;
-    }
-    .rc-header-title {
-        font-size: 2rem;
-        font-weight: 700;
-        color: var(--text);
-        margin-bottom: .3rem;
-    }
-    .rc-header-subtitle {
-        font-size: .95rem;
-        color: var(--muted);
-        max-width: 720px;
-        line-height: 1.45;
-    }
-
-    /* ---------------------- SIDEBAR ---------------------- */
-    section[data-testid="stSidebar"] {
-        background-color: var(--white) !important;
-        border-right: 1px solid var(--border);
-    }
-
-    section[data-testid="stSidebar"] * {
-        color: var(--text) !important;
-        font-size: .95rem;
-    }
-
-    /* Fix all sidebar input boxes */
-    section[data-testid="stSidebar"] input,
-    section[data-testid="stSidebar"] select,
-    section[data-testid="stSidebar"] textarea {
-        background-color: var(--white) !important;
-        color: var(--text) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 8px !important;
-        padding: 6px 10px !important;
-    }
-
-    section[data-testid="stSidebar"] input::placeholder {
-        color: var(--muted) !important;
-    }
-
-    /* Slider text visibility */
-    section[data-testid="stSidebar"] .stSlider label,
-    section[data-testid="stSidebar"] .stSlider span {
-        color: var(--text) !important;
-    }
-
-    /* ---------------------- BUTTONS ---------------------- */
     .stButton > button {
-        background-color: var(--green) !important;
-        color: white !important;
-        padding: .5rem 1.3rem !important;
-        border-radius: 999px !important;
-        font-weight: 600 !important;
-        border: none !important;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.08) !important;
-        transition: all .15s ease;
+        background-color: #5D7B6A;
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+        transition: all 0.3s;
     }
     .stButton > button:hover {
-        background-color: #193828 !important;
-        transform: translateY(-1px);
-        box-shadow: 0 10px 26px rgba(0,0,0,0.12) !important;
+        background-color: #4A5F54;
+        box-shadow: 0 4px 8px rgba(93,123,106,0.3);
     }
-
-    /* ---------------------- METRIC CARDS ---------------------- */
     .metric-card {
-        background: var(--white);
-        padding: 1.3rem;
-        border-radius: 14px;
-        border: 1px solid var(--border);
-        box-shadow: 0 6px 16px rgba(0,0,0,0.05);
-        transition: 0.15s ease;
+        background-color: #f8f9fa;
+        padding: 1.2rem;
+        border-radius: 12px;
+        border-left: 4px solid #5D7B6A;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-    .metric-card:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 26px rgba(0,0,0,0.08);
-    }
-    .metric-card h4 {
-        color: var(--muted);
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        margin-bottom: .4rem;
-    }
-    .metric-card p {
-        font-size: 2rem;
-        color: var(--text);
+    .header-title {
+        font-size: 2.8rem;
         font-weight: 700;
-        margin: 0;
-    }
-
-    /* ---------------------- DATAFRAME ---------------------- */
-    .stDataFrame {
-        background: white;
-        border-radius: 12px !important;
-        border: 1px solid var(--border) !important;
-        box-shadow: 0 6px 18px rgba(0,0,0,0.05) !important;
-    }
-
-    /* ---------------------- FOOTER ---------------------- */
-    .footer {
-        margin-top: 2rem;
-        padding: 2rem 0 1.5rem;
         text-align: center;
-        color: var(--muted);
-        border-top: 1px solid var(--border);
+        color: #2d3a3a;
+        margin-bottom: 0.5rem;
     }
-    .footer strong {
-        color: var(--green);
+    .header-subtitle {
+        text-align: center;
+        color: #6c757d;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
     }
-
+    .footer {
+        text-align: center;
+        padding: 2rem 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+        border-top: 1px solid #dee2e6;
+        margin-top: 3rem;
+    }
+    .stDataFrame, .stTable {
+        background-color: white;
+    }
+    /* Force dark text in code/log blocks */
+    .stCodeBlock, .stCode, code, pre {
+        color: #1a1a1a !important;
+        background-color: #f5f5f5 !important;
+        border: 1px solid #ddd !important;
+        border-radius: 6px !important;
+        padding: 0.5rem !important;
+        font-family: 'Courier New', monospace !important;
+    }
+    /* Improve expander content readability */
+    .streamlit-expanderContent {
+        color: #1a1a1a !important;
+    }
+    /* Optional: darker scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #5D7B6A;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #4A5F54;
+    }
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-# ---------------------- HEADER ----------------------
-st.markdown(
-    """
-<div class="rc-header">
-    <div class="rc-header-kicker">Residual Carbon • Mato Grosso</div>
-    <div class="rc-header-title">Biochar Suitability Mapper</div>
-    <div class="rc-header-subtitle">
-        A professional dashboard for geospatial biochar suitability analysis using H3 hexagons
-        and multiple environmental layers.
-    </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+# Header
+st.markdown('<div class="header-title">Biochar Suitability Mapper</div>', unsafe_allow_html=True)
+st.markdown('<div class="header-subtitle">Precision mapping for sustainable biochar application in Mato Grosso, Brazil</div>', unsafe_allow_html=True)
 
-# ---------------------- SIDEBAR ----------------------
+# Sidebar
 with st.sidebar:
     st.markdown("### Analysis Scope")
-
     use_coords = st.checkbox("Analyze radius around a point", value=False)
-
     lat = lon = radius = None
     if use_coords:
         col1, col2 = st.columns(2)
         lat = col1.number_input("Latitude", value=-13.0, step=0.1, format="%.4f")
         lon = col2.number_input("Longitude", value=-56.0, step=0.1, format="%.4f")
-        radius = st.slider("Radius (km)", 25, 100, 100, 25)
-        st.info(f"Radius: {radius} km")
+        radius = st.slider("Radius (km)", min_value=25, max_value=100, value=100, step=25)
+        st.info(f"Analysis radius: **{radius} km**")
     else:
-        st.info("Analysing full Mato Grosso state.")
+        st.info("Full **Mato Grosso state** analysis")
+    h3_res = st.slider("H3 resolution", 5, 9, config["processing"].get("h3_resolution", 7))
+    run_btn = st.button("Run Analysis", type="primary", use_container_width=True)
 
-    h3_res = st.slider(
-        "H3 Resolution", 5, 9, config["processing"].get("h3_resolution", 7)
-    )
-
-    run_btn = st.button("Run Analysis", use_container_width=True)
-
-# ---------------------- ANALYSIS PIPELINE ----------------------
+# Run analysis
 if run_btn:
-    with st.spinner("Initializing…"):
+    with st.spinner("Initializing..."):
         tmp_raw = Path(tempfile.mkdtemp(prefix="rc_raw_"))
         raw_dir = PROJECT_ROOT / config["data"]["raw"]
-        raw_dir.mkdir(exist_ok=True, parents=True)
+        raw_dir.mkdir(parents=True, exist_ok=True)
 
-        # Use cached GeoTIFFs
-        if len(list(raw_dir.glob("*.tif"))) >= 5:
+        # Check if GeoTIFFs are already cached
+        if raw_dir.exists() and len(list(raw_dir.glob("*.tif"))) >= 5:
+            st.info("Using cached GeoTIFFs")
             shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
         else:
-            st.warning("Downloading GeoTIFFs from Drive…")
+            st.warning("GeoTIFFs not found. Downloading from Google Drive...")
             try:
                 from google.oauth2 import service_account
                 from googleapiclient.discovery import build
@@ -268,153 +185,188 @@ if run_btn:
 
                 creds_info = json.loads(st.secrets["google_drive"]["credentials"])
                 credentials = service_account.Credentials.from_service_account_info(
-                    creds_info,
-                    scopes=["https://www.googleapis.com/auth/drive.readonly"],
+                    creds_info, scopes=['https://www.googleapis.com/auth/drive.readonly']
                 )
-                service = build("drive", "v3", credentials=credentials)
-
+                service = build('drive', 'v3', credentials=credentials)
                 folder_id = config["drive"]["raw_data_folder_id"]
-                results = (
-                    service.files()
-                    .list(
-                        q=f"'{folder_id}' in parents and trashed=false",
-                        fields="files(id, name)",
-                    )
-                    .execute()
-                )
+                results = service.files().list(
+                    q=f"'{folder_id}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'",
+                    fields="files(id, name)"
+                ).execute()
+                files = results.get('files', [])
+                tif_files = [f for f in files if f['name'].endswith('.tif')]
 
-                tif_files = [
-                    f for f in results["files"] if f["name"].endswith(".tif")
-                ]
+                if not tif_files:
+                    st.error("No .tif files found in Drive folder.")
+                    st.stop()
+
                 for file in tif_files:
-                    path = raw_dir / file["name"]
-                    if path.exists():
-                        continue
-                    request = service.files().get_media(fileId=file["id"])
-                    fh = io.BytesIO()
-                    downloader = MediaIoBaseDownload(fh, request)
-                    done = False
-                    while not done:
-                        status, done = downloader.next_chunk()
-                    fh.seek(0)
-                    with open(path, "wb") as f:
-                        f.write(fh.read())
-
+                    filepath = raw_dir / file['name']
+                    if not filepath.exists():
+                        with st.spinner(f"Downloading {file['name']}..."):
+                            request = service.files().get_media(fileId=file['id'])
+                            fh = io.BytesIO()
+                            downloader = MediaIoBaseDownload(fh, request)
+                            done = False
+                            while not done:
+                                status, done = downloader.next_chunk()
+                            fh.seek(0)
+                            with open(filepath, 'wb') as f:
+                                f.write(fh.read())
+                    else:
+                        st.info(f"{file['name']} already downloaded")
+                st.success("All GeoTIFFs downloaded!")
                 shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
-
             except Exception as e:
-                st.error(f"Drive error: {e}")
+                st.error(f"Drive download failed: {e}")
                 st.stop()
 
-        # Run pipeline
+        # === RUN MAIN PIPELINE ===
         wrapper_script = PROJECT_ROOT / "run_analysis.py"
         cli = [
-            sys.executable,
-            str(wrapper_script),
-            "--config",
-            str(PROJECT_ROOT / "configs" / "config.yaml"),
-            "--h3-resolution",
-            str(h3_res),
+            sys.executable, str(wrapper_script),
+            "--config", str(PROJECT_ROOT / "configs" / "config.yaml"),
+            "--h3-resolution", str(h3_res),
         ]
         if lat and lon and radius:
             cli += ["--lat", str(lat), "--lon", str(lon), "--radius", str(radius)]
 
-        process = subprocess.Popen(
+        status_container = st.empty()
+        log_container = st.empty()
+
+        with status_container.container():
+            st.info("Starting analysis pipeline... This may take 2-5 minutes.")
+
+        proc = subprocess.Popen(
             cli,
+            cwd=PROJECT_ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            universal_newlines=True,
+            env={
+                **os.environ,
+                "PYTHONPATH": str(PROJECT_ROOT),
+                "PYTHONUNBUFFERED": "1"
+            },
+            universal_newlines=True
         )
 
-        logs = []
-        log_box = st.empty()
-        start = time.time()
+        output_lines = []
+        last_update = 0
+        update_interval = 0.5
+        start_time = time.time()
 
-        for line in process.stdout:
-            logs.append(line)
-            log_box.code("".join(logs[-12:]), language="bash")
+        while True:
+            line = proc.stdout.readline()
+            if not line:
+                if proc.poll() is not None:
+                    break
+                time.sleep(0.1)
+                continue
 
-        ret = process.wait()
+            output_lines.append(line)
+            current_time = time.time()
 
-        if ret != 0:
-            st.error("Pipeline failed.")
-            st.code("".join(logs))
+            if current_time - last_update > update_interval:
+                elapsed = int(current_time - start_time)
+                with status_container.container():
+                    st.info(f"Running... ({elapsed}s elapsed)")
+
+                recent_lines = output_lines[-10:] if len(output_lines) > 10 else output_lines
+                with log_container.expander("View progress log", expanded=False):
+                    st.code("".join(recent_lines))
+
+                last_update = current_time
+
+        remaining_output, _ = proc.communicate()
+        if remaining_output:
+            output_lines.append(remaining_output)
+
+        returncode = proc.returncode
+        full_output = "".join(output_lines)
+        elapsed_total = int(time.time() - start_time)
+
+        with status_container.container():
+            if returncode == 0:
+                st.success(f"Analysis completed successfully! ({elapsed_total}s)")
+            else:
+                st.error(f"Analysis failed after {elapsed_total}s")
+
+        shutil.rmtree(tmp_raw, ignore_errors=True)
+
+        if returncode != 0:
+            st.error("Analysis failed")
+            if "ModuleNotFoundError" in full_output and "yaml" in full_output.lower():
+                st.error(
+                    "**PyYAML Missing in Subprocess**\n\n"
+                    "The analysis pipeline requires PyYAML. Please ensure `pyyaml>=6.0` is in requirements.txt "
+                    "and restart your Streamlit Cloud deployment.\n\n"
+                    "Current requirements.txt should include:\n"
+                    "```txt\npyyaml>=6.0\n```"
+                )
+            with st.expander("View error log"):
+                st.code(full_output)
             st.stop()
 
-    # ---------------------- DISPLAY RESULTS ----------------------
-    df_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
-    if not df_path.exists():
-        st.error("Results CSV not generated.")
+    # === DISPLAY RESULTS ===
+    csv_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
+    if not csv_path.exists():
+        st.error("Results not generated.")
         st.stop()
 
-    df = pd.read_csv(df_path)
-    st.success("Analysis completed successfully.")
+    df = pd.read_csv(csv_path)
+    st.success("Analysis complete!")
 
-    # === METRIC CARDS ===
-    c1, c2, c3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f'''
+        <div class="metric-card">
+            <h4 style="margin:0;color:#5D7B6A">Hexagons</h4>
+            <p style="font-size:1.8rem;margin:0.4rem 0;color:#2d3a3a">{len(df):,}</p>
+        </div>
+        ''', unsafe_allow_html=True)
+    with col2:
+        mean = df['suitability_score'].mean()
+        st.markdown(f'''
+        <div class="metric-card">
+            <h4 style="margin:0;color:#5D7B6A">Mean Score</h4>
+            <p style="font-size:1.8rem;margin:0.4rem 0;color:#2d3a3a">{mean:.2f}/10</p>
+        </div>
+        ''', unsafe_allow_html=True)
+    with col3:
+        high = (df['suitability_score'] >= 8).sum()
+        st.markdown(f'''
+        <div class="metric-card">
+            <h4 style="margin:0;color:#5D7B6A">High Suitability</h4>
+            <p style="font-size:1.8rem;margin:0.4rem 0;color:#2d3a3a">{high:,}</p>
+        </div>
+        ''', unsafe_allow_html=True)
 
-    with c1:
-        st.markdown(
-            f"""
-        <div class='metric-card'>
-            <h4>Total Hexagons</h4>
-            <p>{len(df):,}</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-    with c2:
-        st.markdown(
-            f"""
-        <div class='metric-card'>
-            <h4>Mean Score</h4>
-            <p>{df['suitability_score'].mean():.2f}</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-    with c3:
-        st.markdown(
-            f"""
-        <div class='metric-card'>
-            <h4>High Suitability (≥8)</h4>
-            <p>{(df['suitability_score'] >= 8).sum():,}</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    # === TABLE ===
     st.subheader("Suitability Scores")
-    st.dataframe(
-        df.sort_values("suitability_score", ascending=False),
-        use_container_width=True,
-    )
+    st.dataframe(df.sort_values("suitability_score", ascending=False), use_container_width=True, hide_index=True)
 
+    csv_data = df.to_csv(index=False).encode()
     st.download_button(
         "Download CSV",
-        df.to_csv(index=False).encode(),
-        "biochar_scores.csv",
+        csv_data,
+        "biochar_suitability_scores.csv",
         "text/csv",
+        use_container_width=True
     )
 
-    # === MAP ===
-    map_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
-    if map_path.exists():
-        st.subheader("Interactive Map")
-        st.components.v1.html(map_path.read_text(), height=720, scrolling=True)
+    html_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
+    if html_path.exists():
+        st.subheader("Interactive Suitability Map")
+        with open(html_path, "r", encoding="utf-8") as f:
+            st.components.v1.html(f.read(), height=700, scrolling=True)
     else:
         st.warning("Map not generated.")
 
-# ---------------------- FOOTER ----------------------
-st.markdown(
-    """
+# Footer
+st.markdown("""
 <div class="footer">
-    <strong>Residual Carbon</strong> • McGill University  
-    Data-driven biochar deployment for ecological impact.
+    <strong>Residual Carbon</strong> • McGill University Capstone<br>
+    Promoting biodiversity through science-driven biochar deployment
 </div>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
