@@ -222,7 +222,7 @@ if run_btn:
     st.success("Analysis completed successfully!")
 
     # ============================================================
-    # METRICS – FINAL VERSION (as you requested)
+    # METRICS – FINAL, CLEAN, WORKING VERSION
     # ============================================================
     col1, col2, col3 = st.columns(3)
 
@@ -232,34 +232,50 @@ if run_btn:
             <h4>Total Hexagons Analyzed</h4>
             <p>{len(df):,}</p>
         </div>
-        </div>
         ''', unsafe_allow_html=True)
 
     with col2:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>Mean Suitability Score<br><small style="color:#173a30; font-weight:500;">(scale: 0–10)</small></h4>
+            <h4>Mean Suitability Score<br>
+                <small style="color:#173a30; font-weight:500;">(scale: 0–10)</small>
+            </h4>
             <p>{df["suitability_score"].mean():.2f}</p>
         </div>
         ''', unsafe_allow_html=True)
 
     with col3:
         moderate_high_count = (df["suitability_score"] >= 7.0).sum()
+        percentage = moderate_high_count / len(df) * 100
         st.markdown(f'''
         <div class="metric-card">
-            <h4>Moderately to Highly Suitable<br><small style="color:#173a30; font-weight:500;">(≥ 7.0 / 10)</small></h4>
-            <p>{moderate_high_count:,}</p>
+            <h4>Moderately to Highly Suitable<br>
+                <small style="color:#173a30; font-weight:500;">(≥ 7.0 / 10)</small>
+            </h4>
+            <p>{moderate_high_count:,} <span style="font-size:1.1rem; color:#64955d;">({percentage:.1f}%)</span></p>
         </div>
         ''', unsafe_allow_html=True)
+
     # ============================================================
-    # MAP
+    # TABLE – NOW VISIBLE AGAIN
     # ============================================================
-    map_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
-    if map_path.exists():
-        st.subheader("Interactive Map")
-        st.components.v1.html(open(map_path, "r", encoding="utf-8").read(), height=720)
-    else:
-        st.warning("Map not generated.")
+    st.subheader("Suitability Scores")
+    st.dataframe(
+        df.sort_values("suitability_score", ascending=False),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # ============================================================
+    # DOWNLOAD BUTTON
+    # ============================================================
+    st.download_button(
+        label="Download Results as CSV",
+        data=df.to_csv(index=False).encode(),
+        file_name="biochar_suitability_scores.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
 
 # ============================================================
 # FOOTER
