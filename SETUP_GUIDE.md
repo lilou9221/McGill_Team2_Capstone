@@ -317,7 +317,16 @@ Once setup is complete, you can:
    PY
    ```
 
-5. **Check project status:**
+5. **Check expected outputs:**
+   After running the analysis, you should see:
+   - `data/processed/merged_soil_data.csv` - Merged and aggregated soil data
+   - `data/processed/suitability_scores.csv` - Biochar suitability scores (0-10 scale) for Streamlit
+   - `output/html/biochar_suitability_map.html` - Main interactive map
+   - `output/html/suitability_map.html` - Streamlit-compatible map (copy of main map)
+   
+   For Streamlit integration, both `suitability_scores.csv` and `suitability_map.html` are automatically generated.
+
+6. **Check project status:**
    - Review `README.md` for project overview and features
    - Check logs in `logs/residual_carbon.log` for processing status
 

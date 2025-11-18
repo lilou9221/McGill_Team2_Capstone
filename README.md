@@ -184,7 +184,7 @@ Verification helpers such as `verify_clipping_success`, `verify_clipped_data_int
 2. **Task Review**: Inspect task summaries and start jobs with confidence.
 3. **Automatic Download**: Files are automatically downloaded from Google Drive to `data/raw/` as export tasks complete (requires Google Drive API setup from Step 5).
 4. **Processing**: Run `python src/main.py` with or without coordinates.
-5. **Score & Map**: Review the returned DataFrame (optionally written to `data/processed/merged_soil_data.csv`) and `output/html/biochar_suitability_map.html`.
+5. **Score & Map**: Review the returned DataFrame (optionally written to `data/processed/merged_soil_data.csv`), suitability scores CSV (`data/processed/suitability_scores.csv`), and interactive maps (`output/html/biochar_suitability_map.html` and `output/html/suitability_map.html`).
 6. **Validate (optional)**: Run the helper verification functions if you need to sanity-check inputs or radius coverage.
 
 ## Data Sources
@@ -262,10 +262,21 @@ The pipeline includes memory optimizations to handle large datasets efficiently:
 The tool generates:
 
 - **GeoTIFF files**: Raw raster data in `data/raw/`
-- **CSV snapshots**: Optional debug exports and final `merged_soil_data.csv` in `data/processed/`
+- **CSV files**: 
+  - `merged_soil_data.csv` - Merged and aggregated soil data in `data/processed/`
+  - `suitability_scores.csv` - Biochar suitability scores with `suitability_score` column (0-10 scale) for Streamlit compatibility in `data/processed/`
 - **Cache files**: Cached clipped rasters, DataFrames, and H3 indexes in `data/processed/cache/`
-- **HTML map**: Interactive biochar suitability map (`biochar_suitability_map.html`) in `output/html/`
+- **HTML maps**: Interactive biochar suitability maps in `output/html/`:
+  - `biochar_suitability_map.html` - Main interactive map with biochar suitability scores (0-100 scale)
+  - `suitability_map.html` - Streamlit-compatible map (copy of main map)
 - **Logs**: Application logs in `logs/`
+
+### Streamlit Integration
+
+The tool generates files specifically for Streamlit web interface compatibility:
+- `suitability_scores.csv` contains scores scaled to 0-10 (from internal 0-100 scale) with `suitability_score` column
+- `suitability_map.html` is a copy of the main map file for Streamlit to display
+- Both files are automatically generated during the analysis pipeline
 
 ## Troubleshooting Highlights
 
