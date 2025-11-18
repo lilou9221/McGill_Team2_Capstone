@@ -60,7 +60,7 @@ st.set_page_config(
 )
 
 # ============================================================
-# CUSTOM CSS
+# CUSTOM CSS — Final theme with dark sidebar + green buttons
 # ============================================================
 st.markdown("""
 <style>
@@ -87,23 +87,24 @@ st.markdown("""
     }
 
     /* ------------------------------------------------------- */
-    /* SIDEBAR — RESIDUAL CARBON GREEN THEME */
+    /* SIDEBAR — Very Dark Green */
     /* ------------------------------------------------------- */
     section[data-testid="stSidebar"] {
-        background-color: #0F4A41 !important;
-        color: #FFFFFF !important;
-        padding-top: 2rem;
+        background-color: #0C2F29 !important;
+        color: white !important;
+        padding-top: 2rem !important;
     }
 
     section[data-testid="stSidebar"] * {
-        color: #FFFFFF !important;
+        color: white !important;
         font-size: 0.95rem !important;
     }
 
+    /* Sidebar inputs */
     section[data-testid="stSidebar"] input,
     section[data-testid="stSidebar"] select,
     section[data-testid="stSidebar"] textarea {
-        background-color: #13584E !important;
+        background-color: #12473F !important;
         color: #FFFFFF !important;
         border: 1px solid #88BFB3 !important;
         border-radius: 8px !important;
@@ -114,15 +115,18 @@ st.markdown("""
         color: #D1E7E2 !important;
     }
 
+    /* Slider text */
     section[data-testid="stSidebar"] .stSlider label,
     section[data-testid="stSidebar"] .stSlider span {
         color: #FFFFFF !important;
     }
 
+    /* Slider track */
     section[data-testid="stSidebar"] .stSlider > div > div > div {
         background-color: #FFFFFF !important;
     }
 
+    /* Slider knob */
     section[data-testid="stSidebar"] .stSlider [role="slider"] {
         background-color: #FFFFFF !important;
         border: 2px solid #FFFFFF !important;
@@ -130,19 +134,40 @@ st.markdown("""
         width: 18px !important;
     }
 
+    /* ------------------------------------------------------- */
+    /* BUTTONS — All Green, White Text */
+    /* ------------------------------------------------------- */
+    .stButton > button,
     section[data-testid="stSidebar"] button {
-        background-color: #561E59 !important;
+        background-color: #234F38 !important;
+        color: #FFFFFF !important;
+        border-radius: 999px !important;
+        font-weight: 600 !important;
+        padding: 0.6rem 1.2rem !important;
+        border: none !important;
+        transition: 0.2s ease !important;
+    }
+
+    .stButton > button:hover,
+    section[data-testid="stSidebar"] button:hover {
+        background-color: #193829 !important;
+    }
+
+    /* Download CSV button */
+    .stDownloadButton > button {
+        background-color: #234F38 !important;
         color: white !important;
         border-radius: 999px !important;
+        padding: 0.6rem 1.2rem !important;
         font-weight: 600 !important;
     }
 
-    section[data-testid="stSidebar"] button:hover {
-        background-color: #3E1441 !important;
+    .stDownloadButton > button:hover {
+        background-color: #193829 !important;
     }
 
     /* ------------------------------------------------------- */
-    /* CARDS */
+    /* METRIC CARDS */
     /* ------------------------------------------------------- */
     .metric-card {
         background-color: #f8f9fa;
@@ -152,7 +177,7 @@ st.markdown("""
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    /* LOG / CODE */
+    /* Logs */
     .stCodeBlock, code, pre {
         background-color: #f5f5f5 !important;
         color: #1a1a1a !important;
@@ -161,7 +186,7 @@ st.markdown("""
         border: 1px solid #ddd !important;
     }
 
-    /* FOOTER */
+    /* Footer */
     .footer {
         text-align: center;
         padding: 2rem 0;
@@ -181,7 +206,7 @@ st.markdown('<div class="header-title">Biochar Suitability Mapper</div>', unsafe
 st.markdown('<div class="header-subtitle">Precision mapping for sustainable biochar application in Mato Grosso, Brazil</div>', unsafe_allow_html=True)
 
 # ============================================================
-# SIDEBAR — BASIC VERSION (AS REQUESTED)
+# SIDEBAR — BASIC VERSION
 # ============================================================
 with st.sidebar:
     st.markdown("### Analysis Scope")
@@ -192,7 +217,7 @@ with st.sidebar:
     if use_coords:
         lat = st.number_input("Latitude", value=-13.0, step=0.1, format="%.4f")
         lon = st.number_input("Longitude", value=-56.0, step=0.1, format="%.4f")
-        radius = st.slider("Radius (km)", 25, 150, 100, 25)
+        radius = st.slider("Radius (km)", min_value=25, max_value=100, value=100, step=25)
 
     h3_res = st.slider(
         "H3 Resolution",
@@ -212,11 +237,11 @@ if run_btn:
         raw_dir = PROJECT_ROOT / config["data"]["raw"]
         raw_dir.mkdir(exist_ok=True)
 
-        # Cached GeoTIFFs?
         if len(list(raw_dir.glob("*.tif"))) >= 5:
             shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
         else:
             st.warning("Downloading GeoTIFFs from Google Drive…")
+
             try:
                 from google.oauth2 import service_account
                 from googleapiclient.discovery import build
@@ -238,25 +263,27 @@ if run_btn:
                 for f in results["files"]:
                     if not f["name"].endswith(".tif"):
                         continue
+
                     dst = raw_dir / f["name"]
                     if dst.exists():
                         continue
+
                     request = service.files().get_media(fileId=f["id"])
                     fh = io.BytesIO()
                     downloader = MediaIoBaseDownload(fh, request)
                     done = False
                     while not done:
                         _, done = downloader.next_chunk()
+
                     with open(dst, "wb") as fp:
                         fp.write(fh.getvalue())
 
                 shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
 
             except Exception as e:
-                st.error(f"Download failed: {e}")
+                st.error(f"TIFF download failed: {e}")
                 st.stop()
 
-    # Build CLI for pipeline
     cli = [
         sys.executable,
         str(PROJECT_ROOT / "run_analysis.py"),
@@ -265,6 +292,7 @@ if run_btn:
         "--h3-resolution",
         str(h3_res)
     ]
+
     if use_coords:
         cli += ["--lat", str(lat), "--lon", str(lon), "--radius", str(radius)]
 
@@ -285,28 +313,28 @@ if run_btn:
     for line in process.stdout:
         logs.append(line)
         status.info(f"Running… {int(time.time()-start)}s elapsed")
-        log_box.code("".join(logs[-12:]), language="bash")
+        log_box.code("".join(logs[-10:]), language="bash")
 
     ret = process.wait()
 
     if ret != 0:
         st.error("Pipeline failed.")
-        st.code("".join(logs), language="bash")
+        st.code("".join(logs))
         st.stop()
 
-    # ============================================================
-    # LOAD RESULTS
-    # ============================================================
     csv_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
     if not csv_path.exists():
-        st.error("Results CSV missing.")
+        st.error("Results missing.")
         st.stop()
 
     df = pd.read_csv(csv_path)
-    st.success("Analysis completed successfully!")
+    st.success("Analysis completed!")
 
+    # ============================================================
     # METRICS
+    # ============================================================
     c1, c2, c3 = st.columns(3)
+
     with c1:
         st.markdown(f"""
         <div class="metric-card">
@@ -314,6 +342,7 @@ if run_btn:
             <p>{len(df):,}</p>
         </div>
         """, unsafe_allow_html=True)
+
     with c2:
         st.markdown(f"""
         <div class="metric-card">
@@ -321,6 +350,7 @@ if run_btn:
             <p>{df['suitability_score'].mean():.2f}</p>
         </div>
         """, unsafe_allow_html=True)
+
     with c3:
         st.markdown(f"""
         <div class="metric-card">
@@ -329,8 +359,14 @@ if run_btn:
         </div>
         """, unsafe_allow_html=True)
 
+    # ============================================================
+    # TABLE
+    # ============================================================
     st.subheader("Suitability Scores")
-    st.dataframe(df.sort_values("suitability_score", ascending=False), use_container_width=True)
+    st.dataframe(
+        df.sort_values("suitability_score", ascending=False),
+        use_container_width=True
+    )
 
     st.download_button(
         "Download CSV",
@@ -339,6 +375,9 @@ if run_btn:
         "text/csv"
     )
 
+    # ============================================================
+    # MAP
+    # ============================================================
     map_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
     if map_path.exists():
         st.subheader("Interactive Map")
@@ -351,7 +390,7 @@ if run_btn:
 # ============================================================
 st.markdown("""
 <div class="footer">
-    <strong>Residual Carbon</strong> • McGill University Capstone  
+    <strong>Residual Carbon</strong> • McGill University  
     Data-driven biochar deployment for ecological impact.
 </div>
 """, unsafe_allow_html=True)
