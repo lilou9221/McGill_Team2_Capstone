@@ -21,7 +21,7 @@ except ImportError:
         "Or install all dependencies: pip install -r requirements.txt"
     )
 
-# Import downscaling module (simple bicubic only - ML is separate)
+# Import downscaling module (bicubic resampling only)
 try:
     from src.data.acquisition.smap_downscaling import downscale_smap_datasets
 except ImportError:

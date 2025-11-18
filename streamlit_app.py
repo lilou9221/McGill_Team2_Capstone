@@ -300,15 +300,15 @@ if run_btn:
                 st.error(f"TIFF download failed: {e}")
                 st.stop()
 
-        # Run pipeline
-        wrapper_script = PROJECT_ROOT / "scripts" / "run_analysis.py"
-        cli = [
-            sys.executable, str(wrapper_script),
-            "--config", str(PROJECT_ROOT / "configs" / "config.yaml"),
-            "--h3-resolution", str(h3_res),
-        ]
-        if use_coords and lat is not None and lon is not None and radius is not None:
-            cli += ["--lat", str(lat), "--lon", str(lon), "--radius", str(radius)]
+    # Build CLI for pipeline
+    wrapper_script = PROJECT_ROOT / "scripts" / "run_analysis.py"
+    cli = [
+        sys.executable, str(wrapper_script),
+        "--config", str(PROJECT_ROOT / "configs" / "config.yaml"),
+        "--h3-resolution", str(h3_res),
+    ]
+    if use_coords and lat is not None and lon is not None and radius is not None:
+        cli += ["--lat", str(lat), "--lon", str(lon), "--radius", str(radius)]
 
     status = st.empty()
     log_box = st.empty()

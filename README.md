@@ -11,7 +11,7 @@ This tool analyzes soil properties (moisture, type, temperature, organic carbon,
 - **Automated Data Retrieval**: Launches parameterized Google Earth Engine exports with per-layer summaries and optional auto-start. Downloads from Google Drive are automatic once configured.
 - **Targeted Spatial Analysis**: Works on the full Mato Grosso extent or user-specified circular AOIs with validation and graceful edge handling.
 - **Robust GeoTIFF Processing**: Clips, converts, and validates rasters before tabularisation, with an in-memory pandas pipeline and optional snapshots.
-- **SMAP Bicubic Downscaling**: Soil moisture and soil temperature rasters (native ~3 km) are automatically resampled to 250 m using bicubic interpolation so they align with the rest of the stack—no ML/Random-Forest path to configure or troubleshoot.
+- **SMAP Bicubic Downscaling**: Soil moisture and soil temperature rasters (native ~3 km) are automatically resampled to 250 m using bicubic interpolation so they align with the rest of the stack.
 - **Performance Caching**: Intelligent caching system speeds up re-runs by caching clipped rasters and DataFrame conversions. Automatically detects changes and invalidates cache when source files are updated.
 - **H3 Hexagonal Grid**: Adds hex indexes for efficient aggregation. Boundary geometry is generated after merge and aggregation to optimize memory usage (prevents memory crashes with large datasets).
 - **Biochar Suitability Scoring**: Calculates biochar suitability scores (0-100 scale) based on soil quality metrics. Uses weighted scoring for moisture, organic carbon, pH, and temperature properties. Lower soil quality = higher biochar suitability.
@@ -95,10 +95,12 @@ The tool automatically downloads exported GeoTIFF files from Google Drive once c
 Edit `configs/config.yaml` to customize:
 
 - Google Earth Engine project name
-- Export resolution (default: 1000m)
+- Export resolution (default: 250m for SMAP datasets, native resolution for others)
 - H3 resolution (default: 7 for clipped areas, 5 for full state)
 - Output directories
 - Optional snapshot persistence for intermediate DataFrames
+
+**Note**: The pipeline automatically filters out old 3000m resolution SMAP files when 250m versions are available. Only the higher-resolution 250m files are used for processing.
 
 ## Usage
 
@@ -208,11 +210,11 @@ Verification helpers such as `verify_clipping_success`, `verify_clipped_data_int
 - **Soil pH**: OpenLandMap (OpenLandMap/SOL/SOL_PH-H2O_USDA-4C1A2A_M/v02)
 - **Land Cover**: ESA WorldCover (ESA/WorldCover/v100)
 
-### SMAP Downscaling (Bicubic-only)
+### SMAP Downscaling
 
 - SMAP soil moisture/temperature arrive at ~3000 m native resolution.
 - During `load_datasets()` the rasters are resampled to 250 m with bicubic interpolation (see `src/data/acquisition/smap_downscaling.py`).
-- The ML/Random-Forest experiment has been fully removed; there is no optional toggle or extra configuration. All exports and downstream processing always rely on the bicubic outputs.
+- All exports and downstream processing use the bicubic-resampled outputs at 250 m resolution.
 
 ## Caching System
 
