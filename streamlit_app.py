@@ -108,8 +108,8 @@ with st.sidebar:
     lat = lon = radius = None
     if use_coords:
         c1, c2 = st.columns(2)
-        with c1: lat = st.number_input("Latitude", value=-13.4500, format="%.6f")
-        with c2: lon = st.number_input("Longitude", value=-56.0000, format="%.6f")
+        with c1: lat = st.number_input("Latitude", value=-13.0, format="%.6f")
+        with c2: lon = st.number_input("Longitude", value=-56.0, format="%.6f")
         radius = st.slider("Radius (km)", 25, 100, 100, 25)
 
     h3_res = st.slider("H3 Resolution", 5, 9, config["processing"].get("h3_resolution", 7))
