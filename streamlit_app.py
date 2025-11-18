@@ -231,7 +231,6 @@ with st.sidebar:
     if use_coords:
         lat = st.number_input("Latitude", value=-13.0, step=0.1, format="%.4f")
         lon = st.number_input("Longitude", value=-56.0, step=0.1, format="%.4f")
-        radius = st.slider("Radius (km)", 25, 150, 100, 25)
         radius = st.slider("Radius (km)", min_value=25, max_value=100, value=100, step=25)
 
     h3_res = st.slider(
