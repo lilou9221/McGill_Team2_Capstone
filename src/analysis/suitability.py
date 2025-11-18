@@ -1,14 +1,20 @@
 """
-Suitability Score Calculator
+Soil Data Merging and Aggregation Module
 
-Calculates suitability scores based on soil property thresholds.
-Merges tabular datasets (CSV files or in-memory DataFrames) and calculates
-individual property scores before producing the final suitability score.
+Merges tabular datasets (CSV files or in-memory DataFrames) by coordinates
+and aggregates data by H3 hexagon regions if available.
+
+This module handles data preparation for suitability scoring:
+- Merges multiple soil property datasets by coordinates
+- Aggregates data by H3 hexagon regions (if H3 indexes are available)
+- Adds H3 boundary geometries for visualization (after aggregation for memory efficiency)
+
+Note: Actual suitability scoring is performed by `biochar_suitability.py` module.
 """
 
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 import pandas as pd
 import numpy as np
 import h3
@@ -17,265 +23,6 @@ import h3
 project_root = Path(__file__).parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-
-from src.analysis.thresholds import load_thresholds, get_property_thresholds
-
-
-def _calculate_property_score_OLD_REMOVED(value: float, thresholds: Dict[str, Any]) -> float:
-    """
-    Calculate score (0-10) for a single property value based on thresholds.
-    
-    Scoring Logic:
-    - Values within optimal range: score 6-10
-      * Middle value of optimal range = 10 (best value)
-      * Edges of optimal range = 6
-      * Linear interpolation between center and edges
-    
-    - Values outside optimal range (above or below): score 0-6
-      * At optimal boundary = 6
-      * Further from optimal range = lower score (closer to 0)
-      * Normalized distance from optimal boundary to acceptable boundary
-    
-    Note: We assume the middle value of the optimal range is the best value.
-    
-    Parameters
-    ----------
-    value : float
-        Property value
-    thresholds : Dict[str, Any]
-        Threshold dictionary for the property
-    
-    Returns
-    -------
-    float
-        Score between 0 and 10 (higher = better soil health, less biochar needed)
-    """
-    if pd.isna(value):
-        return np.nan
-    
-    # Get optimal range (high range = optimal)
-    scoring = thresholds.get('scoring', {})
-    
-    if 'high' not in scoring:
-        # No optimal range defined, return 0
-        return 0.0
-    
-    high_range = scoring['high']
-    if not isinstance(high_range, (list, tuple)) or len(high_range) != 2:
-        # Invalid high range format, return 0
-        return 0.0
-    
-    optimal_min = float(high_range[0])
-    optimal_max = float(high_range[1])
-    
-    # Validate range
-    if optimal_min >= optimal_max:
-        # Invalid range (min >= max), return 0
-        return 0.0
-    
-    # Get acceptable range bounds for distance calculation
-    acceptable_min = thresholds.get('acceptable_min', optimal_min)
-    acceptable_max = thresholds.get('acceptable_max', optimal_max)
-    
-    # Calculate center of optimal range (assumed to be the best value)
-    center = (optimal_min + optimal_max) / 2.0
-    
-    # Calculate distance from optimal range
-    if optimal_min <= value <= optimal_max:
-        # Value is within optimal range - score 6-10
-        # Middle value (center) = 10, edges = 6
-        if optimal_min == optimal_max:
-            return 10.0  # Single optimal value (center)
-        
-        # Calculate distance from center
-        distance_from_center = abs(value - center)
-        max_distance_from_center = (optimal_max - optimal_min) / 2.0
-        
-        if max_distance_from_center == 0:
-            return 10.0
-        
-        # Score decreases from 10 (center) to 6 (edges) as distance from center increases
-        # Linear interpolation: at center (distance=0) -> score=10, at edges (distance=max) -> score=6
-        ratio = 1.0 - (distance_from_center / max_distance_from_center)
-        score = 6.0 + (ratio * 4.0)  # 6 to 10
-        return max(6.0, min(10.0, score))
-    
-    elif value < optimal_min:
-        # Value is below optimal range - score 0-6
-        # At optimal_min (boundary) = 6, further away = lower
-        
-        # Check if value is below acceptable range (very poor)
-        if value < acceptable_min:
-            # Value is beyond acceptable range - score 0
-            return 0.0
-        
-        # Calculate distance from optimal boundary
-        distance = optimal_min - value
-        
-        # Calculate maximum possible distance (from acceptable_min to optimal_min)
-        max_distance = optimal_min - acceptable_min
-        
-        if max_distance <= 0:
-            # No range below optimal, use a default penalty
-            # Score decreases from 6 to 0 as distance increases
-            return max(0.0, 6.0 - (distance * 6.0 / abs(optimal_min) if optimal_min != 0 else distance * 6.0))
-        
-        # Score decreases from 6 to 0 as distance increases
-        # Linear interpolation: at optimal_min (distance=0) -> score=6, at acceptable_min (distance=max_distance) -> score=0
-        ratio = 1.0 - (distance / max_distance)
-        score = ratio * 6.0  # 0 to 6
-        return max(0.0, min(6.0, score))
-    
-    else:  # value > optimal_max
-        # Value is above optimal range - score 0-6
-        # At optimal_max (boundary) = 6, further away = lower
-        
-        # Check if value is above acceptable range (very poor)
-        if value > acceptable_max:
-            # Value is beyond acceptable range - score 0
-            return 0.0
-        
-        # Calculate distance from optimal boundary
-        distance = value - optimal_max
-        
-        # Calculate maximum possible distance (from optimal_max to acceptable_max)
-        max_distance = acceptable_max - optimal_max
-        
-        if max_distance <= 0:
-            # No range above optimal, use a default penalty
-            # Score decreases from 6 to 0 as distance increases
-            return max(0.0, 6.0 - (distance * 6.0 / abs(optimal_max) if optimal_max != 0 else distance * 6.0))
-        
-        # Score decreases from 6 to 0 as distance increases
-        # Linear interpolation: at optimal_max (distance=0) -> score=6, at acceptable_max (distance=max_distance) -> score=0
-        ratio = 1.0 - (distance / max_distance)
-        score = ratio * 6.0  # 0 to 6
-        return max(0.0, min(6.0, score))
-
-
-def _calculate_suitability_scores_OLD_REMOVED(
-    df: pd.DataFrame,
-    thresholds: Dict[str, Any],
-    property_weights: Optional[Dict[str, float]] = None
-) -> pd.DataFrame:
-    """
-    Calculate suitability scores for all properties and final combined score.
-    
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame with soil property columns (lon, lat, h3_index, soil_moisture, etc.)
-    thresholds : Dict[str, Any]
-        Full thresholds dictionary
-    property_weights : Dict[str, float], optional
-        Weights for each property. If None, uses equal weights (default: None)
-    
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with added score columns and final suitability_score
-    """
-    df = df.copy()
-    
-    # Property names to score (only the 4 with thresholds)
-    properties_to_score = ['soil_moisture', 'soil_temperature', 'soil_organic_carbon', 'soil_pH']
-    
-    # Map property names to column name patterns (handle different naming conventions)
-    property_column_patterns = {
-        'soil_moisture': ['soil_moisture', 'sm_surface'],
-        'soil_temperature': ['soil_temp', 'soil_temperature', 'soil_temp_layer1'],
-        'soil_organic_carbon': ['soc', 'soil_organic_carbon'],
-        'soil_pH': ['soil_ph', 'soil_pH']
-    }
-    
-    # Find columns that match property names (handle resolution suffixes)
-    def find_property_column(prop_name: str) -> Optional[str]:
-        """Find column name that matches property name."""
-        patterns = property_column_patterns.get(prop_name, [prop_name])
-        
-        # First try exact matches
-        for pattern in patterns:
-            if pattern in df.columns:
-                return pattern
-        
-        # Then try columns that start with or contain the pattern (handles resolution suffixes)
-        for col in df.columns:
-            col_lower = col.lower()
-            # Exclude score columns and coordinate columns
-            if 'score' in col_lower or col_lower in ['lon', 'lat', 'h3_index']:
-                continue
-            
-            # Check if column matches any pattern
-            for pattern in patterns:
-                pattern_lower = pattern.lower()
-                # Check if column starts with pattern or contains it
-                if col_lower.startswith(pattern_lower) or pattern_lower in col_lower:
-                    return col
-        
-        return None
-    
-    # Calculate individual property scores
-    score_columns = []
-    for prop_name in properties_to_score:
-        # Find the actual column name in the DataFrame
-        column_name = find_property_column(prop_name)
-        
-        if column_name is None:
-            # Property not found in DataFrame, skip
-            print(f"  Warning: Column for {prop_name} not found in DataFrame")
-            continue
-        
-        # Get thresholds for this property
-        try:
-            prop_thresholds = get_property_thresholds(thresholds, prop_name)
-        except KeyError:
-            # Property not in thresholds, skip
-            continue
-        
-        # Calculate scores
-        score_col_name = f"{prop_name}_score"
-        df[score_col_name] = df[column_name].apply(
-            lambda x: _calculate_property_score_OLD_REMOVED(x, prop_thresholds)
-        )
-        score_columns.append(score_col_name)
-    
-    # Calculate final suitability score (weighted average)
-    if not score_columns:
-        # No scores calculated, return original DataFrame
-        return df
-    
-    # Set default weights (equal weights)
-    if property_weights is None:
-        property_weights = {col: 1.0 for col in score_columns}
-    
-    # Normalize weights
-    total_weight = sum(property_weights.get(col, 1.0) for col in score_columns)
-    if total_weight > 0:
-        normalized_weights = {col: property_weights.get(col, 1.0) / total_weight for col in score_columns}
-    else:
-        normalized_weights = {col: 1.0 / len(score_columns) for col in score_columns}
-    
-    # Calculate weighted average (only for rows with at least one valid score)
-    def calculate_final_score(row):
-        scores = [row[col] for col in score_columns if pd.notna(row[col])]
-        weights = [normalized_weights[col] for col in score_columns if pd.notna(row[col])]
-        
-        if not scores:
-            return np.nan
-        
-        # Normalize weights for available scores
-        total_available_weight = sum(weights)
-        if total_available_weight > 0:
-            weights = [w / total_available_weight for w in weights]
-        
-        # Weighted average
-        final_score = sum(s * w for s, w in zip(scores, weights))
-        return min(10.0, max(0.0, final_score))  # Clamp to 0-10
-    
-    df['suitability_score'] = df.apply(calculate_final_score, axis=1)
-    
-    return df
-
 
 def merge_csv_files_by_coordinates(
     csv_files: List[Path],
@@ -452,12 +199,12 @@ def merge_and_aggregate_soil_data(
             if lon_column not in df.columns or lat_column not in df.columns:
                 print(f"  Warning: DataFrame '{name}' missing coordinates, skipping")
                 continue
-            working = df.copy()
-            working[lon_column] = working[lon_column].round(6)
-            working[lat_column] = working[lat_column].round(6)
-            loaded_frames.append(working)
+            # Round coordinates in-place to avoid copy (if possible)
+            df[lon_column] = df[lon_column].round(6)
+            df[lat_column] = df[lat_column].round(6)
+            loaded_frames.append(df)
             source_names.append(name)
-            print(f"  Loaded '{name}': {len(working):,} rows, {len(working.columns)} columns")
+            print(f"  Loaded '{name}': {len(df):,} rows, {len(df.columns)} columns")
     else:
         csv_files = [f for f in csv_dir.glob(pattern) if 'suitability' not in f.name.lower()]
         if not csv_files:
@@ -596,85 +343,4 @@ def merge_and_aggregate_soil_data(
         print(f"  Saved merged data to: {output_csv}")
     
     return data_for_scoring
-
-
-if __name__ == "__main__":
-    """Debug and test suitability scoring."""
-    import sys
-    
-    print("""============================================================
-Suitability Score Calculator - Debug Mode
-============================================================
-    
-------------------------------------------------------------
-1. Testing calculate_property_score():
-------------------------------------------------------------""")
-    
-    # Load thresholds
-    try:
-        thresholds = load_thresholds()
-        print("PASS: Thresholds loaded successfully")
-    except Exception as e:
-        print(f"FAIL: Error loading thresholds: {type(e).__name__}: {e}")
-        sys.exit(1)
-    
-    # Test scoring for each property
-    test_cases = [
-        ('soil_moisture', 0.2, "Optimal range"),
-        ('soil_moisture', 0.05, "Below optimal (dry)"),
-        ('soil_moisture', 0.5, "Above optimal (saturated)"),
-        ('soil_temperature', 290.0, "Optimal range (17°C)"),
-        ('soil_temperature', 275.0, "Below optimal (2°C)"),
-        ('soil_organic_carbon', 100.0, "High organic matter"),
-        ('soil_organic_carbon', 50.0, "Medium organic matter"),
-        ('soil_pH', 6.5, "Optimal pH"),
-        ('soil_pH', 4.5, "Below optimal pH"),
-    ]
-    
-    # Test with actual CSV files if available
-    print("""
-------------------------------------------------------------
-2. Testing data merging and aggregation:
-------------------------------------------------------------""")
-    
-    project_root = Path(__file__).parent.parent.parent
-    csv_dir = project_root / "data" / "processed"
-    
-    if csv_dir.exists():
-        csv_files = list(csv_dir.glob("*.csv"))
-        if csv_files:
-            print(f"  Found {len(csv_files)} CSV file(s) in {csv_dir}")
-            print("  Testing data merging and aggregation...")
-            
-            try:
-                merged_df = merge_and_aggregate_soil_data(
-                    csv_dir=csv_dir,
-                    output_csv=csv_dir / "merged_soil_data_test.csv"
-                )
-                print(f"""  PASS: Successfully merged and aggregated data
-    Output rows: {len(merged_df):,}
-    Columns: {len(merged_df.columns)}
-    Sample data:
-{merged_df.head() if not merged_df.empty else 'No data'}""")
-            except Exception as e:
-                print(f"  FAIL: Error merging data: {type(e).__name__}: {e}")
-                import traceback
-                traceback.print_exc()
-        else:
-            print(f"  No CSV files found in {csv_dir}")
-    else:
-        print(f"  Directory not found: {csv_dir}")
-    
-    print("""
-------------------------------------------------------------
-Usage Example:
-------------------------------------------------------------
-  from src.analysis.suitability import merge_and_aggregate_soil_data
-  from src.analysis.biochar_suitability import calculate_biochar_suitability_scores
-  from pathlib import Path
-  
-  csv_dir = Path('data/processed')
-  merged_df = merge_and_aggregate_soil_data(csv_dir=csv_dir)
-  scored_df = calculate_biochar_suitability_scores(merged_df)
-------------------------------------------------------------""")
 

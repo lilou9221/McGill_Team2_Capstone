@@ -152,8 +152,13 @@ def collect_geotiff_files(input_dir: Path, pattern: str = "*.tif") -> List[Path]
     all_tif_files = sorted(input_dir.glob(pattern))
     
     # Filter: Prefer 250m over 3000m resolution files
+    # For SOC and pH: include both b0 and b10 (used in scoring)
+    # For soil_type: prefer b0 over deeper layers (b10, b30, b60)
     # Find all 250m files
     res_250_files = {f.name for f in all_tif_files if 'res_250' in f.name}
+    
+    # Find all b0 files for datasets with multiple depth layers
+    b0_files = {f.name for f in all_tif_files if '_b0' in f.name}
     
     tif_files = []
     for tif in all_tif_files:
@@ -163,6 +168,32 @@ def collect_geotiff_files(input_dir: Path, pattern: str = "*.tif") -> List[Path]
             potential_250m_name = tif.name.replace('res_3000', 'res_250')
             if potential_250m_name in res_250_files:
                 continue  # Skip this 3000m file, use 250m version instead
+        
+        # For SOC and pH: include b0 and b10 (both used in scoring)
+        # For soil_type: prefer b0 over b10, b30, b60
+        # Check if this is a deeper layer file (b10, b30, b60)
+        if any(depth in tif.name for depth in ['_b10', '_b30', '_b60']):
+            # Check if this is SOC or pH - include b10, exclude b30 and b60
+            if any(dataset in tif.name.lower() for dataset in ['soc', 'ph']):
+                # Include b10 for SOC and pH
+                if '_b10' in tif.name:
+                    tif_files.append(tif)
+                    continue
+                # Exclude b30 and b60 for SOC and pH (only use b0 and b10)
+                elif any(depth in tif.name for depth in ['_b30', '_b60']):
+                    continue
+            # For soil_type: prefer b0 over b10, b30, b60
+            elif 'soil_type' in tif.name.lower():
+                # Check if corresponding b0 file exists
+                potential_b0_name = None
+                for depth in ['_b10', '_b30', '_b60']:
+                    if depth in tif.name:
+                        potential_b0_name = tif.name.replace(depth, '_b0')
+                        break
+                
+                if potential_b0_name and potential_b0_name in b0_files:
+                    continue  # Skip this deeper layer file, use b0 instead
+        
         tif_files.append(tif)
     
     return tif_files

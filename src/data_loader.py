@@ -164,10 +164,11 @@ Layer Selection
             
             print(f"\nSelected {len(selected_layers)} layer(s): {', '.join(selected_layers)}")
         
-        # Only export if layers were selected
+        # Export layers to Google Drive (all selected layers are exported)
+        # Note: Only scoring-required datasets will be imported/cached during processing
         if selected_layers:
             try:
-                # Create export tasks for selected layers only
+                # Create export tasks for selected layers
                 print("\nCreating export tasks...")
                 tasks = loader.create_export_tasks(selected_layers=selected_layers)
                 
@@ -199,7 +200,37 @@ Troubleshooting:
   3. Check that you have sufficient Drive storage""")
                 return 1
         else:
-            print("\nSTEP 4 skipped (no layers selected for export)")
+            # No layers selected - export all layers
+            try:
+                print("\nNo layers explicitly selected. Exporting all layers...")
+                tasks = loader.create_export_tasks(selected_layers=None)
+                
+                # Start export tasks
+                print("\nStarting export tasks...")
+                task_ids = loader.start_export_tasks()
+                
+                print("""
+------------------------------------------------------------
+Export tasks started successfully!
+Files will be exported to Google Drive folder:
+  https://drive.google.com/drive/folders/1IIBYV68TBZ2evWnUYgBZY9mKI2PalciE
+------------------------------------------------------------
+
+To download files manually:
+  1. Wait for exports to complete in Google Earth Engine
+  2. Check export status at: https://code.earthengine.google.com/
+  3. Download files manually from the Google Drive folder (link above)
+  4. Place downloaded files in the 'data/raw/' folder""")
+                
+                print("\nSTEP 4 completed successfully!")
+            except Exception as e:
+                print(f"""Error during export: {e}
+
+Troubleshooting:
+  1. Check that GEE export tasks are accessible
+  2. Verify Google Drive API is enabled
+  3. Check that you have sufficient Drive storage""")
+                return 1
         
         print("""
 ============================================================

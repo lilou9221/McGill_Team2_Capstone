@@ -1,18 +1,18 @@
 """
 Map Generator Module
 
-Creates interactive maps with suitability scores.
+Creates interactive maps with suitability scores using PyDeck.
+
+This module provides functions to generate interactive HTML maps:
+- Uses PyDeck for all map generation (H3 hexagons and point layers)
+- Supports both general suitability maps and property-specific maps
+- Automatically handles H3 hexagon visualization when available
 """
 
 from pathlib import Path
 from typing import Optional, Dict, Any
 import pandas as pd
-import numpy as np
 
-from src.visualization.color_scheme import (
-    get_color_for_biochar_suitability,
-    get_biochar_suitability_color_rgb
-)
 from src.visualization.pydeck_map import create_pydeck_map
 
 
@@ -24,13 +24,10 @@ def create_suitability_map(
     center_lat: Optional[float] = None,
     center_lon: Optional[float] = None,
     zoom_start: int = 6,
-    prefer_pydeck: bool = True  # Prefer PyDeck for H3 hexagons (matches Capstone format)
+    prefer_pydeck: bool = True
 ) -> Dict[str, Any]:
     """
-    Create interactive suitability map.
-    
-    Uses PyDeck for H3 hexagons (matches Capstone format), 
-    falls back to Folium for points or if PyDeck fails.
+    Create interactive suitability map using PyDeck.
     
     Parameters
     ----------
@@ -39,7 +36,7 @@ def create_suitability_map(
     output_path : Path
         Path to save HTML file
     max_file_size_mb : float, optional
-        Maximum file size in MB before switching to PyDeck (default: 100.0)
+        Maximum file size in MB (default: 100.0, kept for compatibility)
     use_h3 : bool, optional
         Use H3 hexagons if available (default: True)
     center_lat : float, optional
@@ -49,7 +46,7 @@ def create_suitability_map(
     zoom_start : int, optional
         Initial zoom level (default: 6)
     prefer_pydeck : bool, optional
-        Prefer PyDeck for H3 hexagons (default: True, matches Capstone format)
+        Use PyDeck (default: True, kept for compatibility)
     
     Returns
     -------
@@ -77,114 +74,29 @@ def create_suitability_map(
     # Check if H3 indexes are available
     has_h3 = use_h3 and 'h3_index' in df.columns
     
-    # Prefer PyDeck for H3 hexagons (matches Capstone format)
-    if has_h3 and prefer_pydeck:
-        print(f"\nCreating map with PyDeck (H3 hexagons)...")
-        print(f"  Data points: {len(df):,}")
-        print(f"  Using H3 hexagons: {has_h3}")
-        
-        try:
-            # Create PyDeck map
-            create_pydeck_map(
-                df=df,
-                output_path=output_path,
-                use_h3=has_h3,
-                center_lat=center_lat,
-                center_lon=center_lon,
-                zoom_start=zoom_start
-            )
-            
-            file_size_mb = output_path.stat().st_size / (1024 * 1024)
-            print(f"  PyDeck map created: {file_size_mb:.2f} MB")
-            
-            return {
-                'method': 'pydeck',
-                'file_size_mb': file_size_mb,
-                'file_path': output_path
-            }
-        except Exception as e:
-            print(f"  Error creating PyDeck map: {e}")
-            print(f"  Falling back to Folium...")
-            # Continue to Folium fallback
-    
-    # Try Folium (for points or as fallback)
-    print(f"\nCreating map with Folium...")
+    # Use PyDeck for all maps (matches Capstone format)
+    print(f"\nCreating map with PyDeck...")
     print(f"  Data points: {len(df):,}")
     print(f"  Using H3 hexagons: {has_h3}")
     
-    try:
-        # Create Folium map
-        folium_path = output_path.parent / f"{output_path.stem}_folium.html"
-        create_folium_map(
-            df=df,
-            output_path=folium_path,
-            use_h3=has_h3,
-            center_lat=center_lat,
-            center_lon=center_lon,
-            zoom_start=zoom_start
-        )
-        
-        # Check file size
-        file_size_mb = folium_path.stat().st_size / (1024 * 1024)
-        print(f"  Folium map created: {file_size_mb:.2f} MB")
-        
-        if file_size_mb > max_file_size_mb:
-            print(f"  File size ({file_size_mb:.2f} MB) exceeds limit ({max_file_size_mb} MB)")
-            print(f"  Switching to PyDeck...")
-            
-            # Delete Folium map and create PyDeck map
-            folium_path.unlink()
-            
-            # Create PyDeck map
-            create_pydeck_map(
-                df=df,
-                output_path=output_path,
-                use_h3=has_h3,
-                center_lat=center_lat,
-                center_lon=center_lon,
-                zoom_start=zoom_start
-            )
-            
-            file_size_mb = output_path.stat().st_size / (1024 * 1024)
-            print(f"  PyDeck map created: {file_size_mb:.2f} MB")
-            
-            return {
-                'method': 'pydeck',
-                'file_size_mb': file_size_mb,
-                'file_path': output_path
-            }
-        else:
-            # Rename to final output path
-            folium_path.rename(output_path)
-            
-            return {
-                'method': 'folium',
-                'file_size_mb': file_size_mb,
-                'file_path': output_path
-            }
+    # Create PyDeck map
+    create_pydeck_map(
+        df=df,
+        output_path=output_path,
+        use_h3=has_h3,
+        center_lat=center_lat,
+        center_lon=center_lon,
+        zoom_start=zoom_start
+    )
     
-    except Exception as e:
-        print(f"  Error creating Folium map: {e}")
-        print(f"  Falling back to PyDeck...")
-        
-        # Create PyDeck map
-        create_pydeck_map(
-            df=df,
-            output_path=output_path,
-            use_h3=has_h3,
-            center_lat=center_lat,
-            center_lon=center_lon,
-            zoom_start=zoom_start
-        )
-        
-        file_size_mb = output_path.stat().st_size / (1024 * 1024)
-        print(f"  PyDeck map created: {file_size_mb:.2f} MB")
-        
-        return {
-            'method': 'pydeck',
-            'file_size_mb': file_size_mb,
-            'file_path': output_path
-        }
+    file_size_mb = output_path.stat().st_size / (1024 * 1024)
+    print(f"  PyDeck map created: {file_size_mb:.2f} MB")
+    
+    return {
+        'method': 'pydeck',
+        'file_size_mb': file_size_mb,
+        'file_path': output_path
+    }
 
 
 def create_property_map(
