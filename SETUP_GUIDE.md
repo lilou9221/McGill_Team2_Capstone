@@ -147,6 +147,7 @@ Edit `configs/config.yaml` to customize:
 - **H3 Resolution**: Default 7 for clipped areas (higher = finer hexagons). Full state uses resolution 5 automatically.
 - **Export Folder**: Must match in both `gee.export_folder` and `drive.download_folder`
 - **Persist Snapshots**: Set `processing.persist_snapshots` to `true` to keep intermediate CSV tables for debugging
+- **Cache Cleanup**: Set `processing.cleanup_old_cache` to `false` to disable automatic cleanup of old coordinate-specific caches (default: `true`)
 - **SMAP Resampling**: Soil moisture and soil temperature are always bicubic-resampled from ~3000 m to 250 m inside `load_datasets()`. The pipeline automatically prefers 250m files over 3000m files if both exist in `data/raw/`.
 
 ## Troubleshooting
@@ -238,10 +239,11 @@ The tool includes an intelligent caching system that significantly speeds up re-
 
 - **Location**: `data/processed/cache/`
 - **Size**: Typically 10-100 MB depending on area size and number of datasets
-- **Automatic cleanup**: When new coordinates are provided, old coordinate-specific caches are automatically cleaned up
-  - Preserved caches: Full state cache and protected coordinates (-13, -56, 100km)
-  - Only coordinate-specific caches (clipped_rasters) are cleaned up
+- **Automatic cleanup**: Old coordinate-specific caches are automatically cleaned up on each run
+  - Preserved caches: Full state cache (no coordinates), protected coordinates (-13, -56, 100km), and current coordinates (same lat/lon/radius as current run)
+  - Only old coordinate-specific caches (clipped_rasters) that don't match the above are removed
   - A message is displayed showing how many old caches were cleaned up
+  - Can be disabled by setting `processing.cleanup_old_cache: false` in config
 - **Manual clearing**: Delete `data/processed/cache/` directory to force regeneration of all caches
 - **Git ignore**: Cache files are excluded from Git (see `.gitignore`)
 
