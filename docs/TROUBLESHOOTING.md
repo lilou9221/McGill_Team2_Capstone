@@ -191,7 +191,7 @@ pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml pyar
 **Problem**: Auto-open fails or map doesn't display correctly.
 
 **Solution**:
-- Manually open the HTML file: `output/html/biochar_suitability_map.html`
+- Manually open the HTML file: `output/html/biochar_suitability_map.html` or `output/html/suitability_map.html`
 - Check browser console for JavaScript errors
 - Try a different browser
 - Disable auto-open in config and open manually
@@ -204,11 +204,24 @@ pip install earthengine-api rasterio pandas h3 folium pydeck shapely pyyaml pyar
 **Solution**:
 - Check that `merged_soil_data.csv` exists and has data
 - Verify the file has `lon`, `lat`, and required property columns (moisture, SOC, pH, temperature)
-- Check that biochar suitability scores are in valid range (0-100)
-- Review the data in `data/processed/merged_soil_data.csv`
+- Check that biochar suitability scores are in valid range (0-100 in main map, 0-10 in Streamlit CSV)
+- Review the data in `data/processed/merged_soil_data.csv` or `data/processed/suitability_scores.csv`
 - Ensure the H3 resolution you selected matches what the visualisation expects (defaults to 7)
+- For Streamlit: Verify that `suitability_scores.csv` exists with `suitability_score` column (0-10 scale)
 
 **Note**: When using H3 hexagons, clicking or hovering over a hexagon displays a tooltip with the biochar suitability score, suitability grade, recommendation, H3 index, location coordinates, and point count.
+
+### Streamlit: Results not displayed
+
+**Problem**: Analysis completes successfully but maps and results are not shown in Streamlit.
+
+**Solution**:
+- Verify that `data/processed/suitability_scores.csv` exists and contains the `suitability_score` column
+- Check that `output/html/suitability_map.html` exists (this is the Streamlit-compatible map file)
+- Ensure scores are in 0-10 range (the CSV file should have scores scaled from 0-100 to 0-10)
+- Check the Streamlit console/logs for any file path errors
+- Verify the config paths match: `config["data"]["processed"]` and `config["output"]["html"]`
+- The program automatically generates both files during analysis - if they're missing, re-run the analysis
 
 ### PYTHONPATH / import issues outside PyCharm
 
