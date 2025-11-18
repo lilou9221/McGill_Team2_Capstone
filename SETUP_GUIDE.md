@@ -143,11 +143,11 @@ If you run scripts from terminals outside PyCharm, add the project root to `PYTH
 Edit `configs/config.yaml` to customize:
 
 - **GEE Project Name**: Your Google Earth Engine project name
-- **Export Resolution**: Default 1000m (affects processing time and file size)
+- **Export Resolution**: Default 250m for SMAP datasets (soil moisture, temperature), native resolution for other datasets
 - **H3 Resolution**: Default 7 for clipped areas (higher = finer hexagons). Full state uses resolution 5 automatically.
 - **Export Folder**: Must match in both `gee.export_folder` and `drive.download_folder`
 - **Persist Snapshots**: Set `processing.persist_snapshots` to `true` to keep intermediate CSV tables for debugging
-- **SMAP Resampling**: Soil moisture and soil temperature are always bicubic-resampled from ~3000 m to 250 m inside `load_datasets()`. There is intentionally no optional ML/Random-Forest toggle anymore—every run uses the bicubic outputs.
+- **SMAP Resampling**: Soil moisture and soil temperature are always bicubic-resampled from ~3000 m to 250 m inside `load_datasets()`. The pipeline automatically prefers 250m files over 3000m files if both exist in `data/raw/`.
 
 ## Troubleshooting
 
