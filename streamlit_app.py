@@ -226,7 +226,7 @@ with st.sidebar:
         value=config["processing"].get("h3_resolution", 7)
     )
 
-    run_btn = st.button("Run Analysis", width="stretch")   # FIXED
+    run_btn = st.button("Run Analysis", width="stretch")
 
 # ============================================================
 # MAIN ANALYSIS PIPELINE
@@ -362,15 +362,18 @@ if run_btn:
     st.subheader("Suitability Scores")
     st.dataframe(
         df.sort_values("suitability_score", ascending=False),
-        width="stretch"     # FIXED
+        width="stretch"
     )
 
+    # ============================================================
+    # DOWNLOAD BUTTON — FIXED
+    # ============================================================
     st.download_button(
-        "Download CSV",
-        df.to_csv(index=False).encode(),
-        "biochar_suitability_scores.csv",
-        "text/csv",
-        width="stretch"     # FIXED
+        label="Download CSV",
+        data=df.to_csv(index=False).encode(),
+        file_name="biochar_suitability_scores.csv",
+        mime="text/csv",
+        width="stretch"
     )
 
     # ============================================================
