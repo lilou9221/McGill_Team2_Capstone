@@ -16,7 +16,7 @@ This tool analyzes soil properties (moisture, type, temperature, organic carbon,
 - **H3 Hexagonal Grid**: Adds hex indexes for efficient aggregation using vectorized operations (5-10x faster than previous implementation). Boundary geometry is generated after merge and aggregation to optimize memory usage (prevents memory crashes with large datasets).
 - **Biochar Suitability Scoring**: Calculates biochar suitability scores (0-100 scale) based on soil quality metrics. Uses weighted scoring for moisture, organic carbon (averages b0 and b10 depth layers), pH (averages b0 and b10 depth layers), and temperature properties. Lower soil quality = higher biochar suitability.
 - **Smart Dataset Filtering**: Automatically filters to only scoring-required datasets during processing. All datasets are exported to Google Drive, but only scoring-required files (soil_moisture, SOC b0/b10, pH b0/b10, soil_temperature) are imported for processing, reducing memory usage and processing time.
-- **Interactive Maps**: Generates PyDeck-based HTML visualisations with interactive tooltips showing biochar suitability scores, suitability grades, recommendations, H3 hexagon indexes, location coordinates, and point counts. Maps auto-open in browser (configurable).
+- **Interactive Maps**: Generates PyDeck-based HTML visualisations with interactive tooltips showing biochar suitability scores, suitability grades, recommendations, H3 hexagon indexes, location coordinates, and point counts. Maps are generated directly from CSV data using PyDeck. Maps auto-open in browser (configurable).
 - **Auditable Workflow**: Each stage can be run independently, and helper utilities exist to verify intermediate results.
 
 ## Installation
@@ -192,7 +192,7 @@ The core pipeline lives in `src/main.py` and wires high-level helpers from each 
 5. **Hex indexing** (`process_dataframes_with_h3`) — injects `h3_index` at the requested resolution using vectorized operations (5-10x faster than previous implementation). Boundary geometry is excluded during indexing and merging to optimize memory usage. **Cached** to speed up re-runs (see Caching System section).
 6. **Data merging and aggregation** (`merge_and_aggregate_soil_data`) — merges property tables (without boundaries), aggregates by hex, and generates boundaries for aggregated hexagons only.
 7. **Biochar suitability scoring** (`calculate_biochar_suitability_scores`) — calculates biochar suitability scores based on soil quality metrics. For SOC and pH, averages both b0 (surface) and b10 (10cm depth) layers to provide a more representative soil profile assessment. Uses weighted scoring for moisture, organic carbon, pH, and temperature properties.
-8. **Visualisation** (`create_biochar_suitability_map`) — renders an interactive PyDeck map with biochar suitability scores and saves it under `output/html/`.
+8. **Visualisation** (`create_biochar_suitability_map`) — renders an interactive PyDeck map directly from CSV data with biochar suitability scores and saves it under `output/html/`.
 
 Verification helpers such as `verify_clipping_success` and `verify_clipped_data_integrity` can be run independently when you need to inspect intermediate outputs.
 

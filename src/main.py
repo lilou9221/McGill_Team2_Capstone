@@ -8,7 +8,8 @@ Simple workflow:
 3. Score each value based on thresholds
 4. Get H3 index for each point
 5. Aggregate within hexagons -> final score per hexagon
-6. Output HTML map (PyDeck format)
+6. Save results to CSV
+7. Output HTML map (PyDeck format, generated from CSV data)
 """
 
 import argparse
@@ -198,8 +199,11 @@ def main():
     
     # Step 1: Clip GeoTIFFs to circle (if coordinates provided)
     if area.use_full_state:
-        # Use full state - no clipping needed
-        tif_dir = raw_dir
+        # Use full state - no clipping needed, but still filter to only scoring-required files
+        # Create a temporary directory with only filtered files
+        tif_dir = Path(tempfile.mkdtemp(prefix="residual_carbon_filtered_"))
+        for tif_file in filtered_tif_files:
+            shutil.copy2(tif_file, tif_dir / tif_file.name)
         print("Using full Mato Grosso state data")
         # Use coarser H3 resolution (5) for full state
         h3_resolution = 5
@@ -277,6 +281,7 @@ def main():
         return 1
 
     # Clean up temp directory
+    # Clean up temporary directory (for both full state filtered dir and clipped dir)
     if tif_dir != raw_dir and tif_dir.exists():
         shutil.rmtree(tif_dir, ignore_errors=True)
 
@@ -329,106 +334,6 @@ def main():
     del scored_df_for_csv  # Free memory immediately after saving
     print(f"\nSuitability scores saved to: {suitability_csv_path}")
     
-    # Save GeoJSON file with hexagon geometry for efficient map rendering
-    geojson_path = processed_dir / "hexagons_with_scores.geojson"
-    try:
-        import geopandas as gpd
-        from shapely.geometry import Polygon
-        import h3
-        
-        # Check if we have h3_boundary_geojson column (from aggregation)
-        if 'h3_boundary_geojson' in scored_df.columns:
-            # Convert h3_boundary_geojson to Shapely Polygon
-            def boundary_to_polygon(boundary_list):
-                """Convert h3_boundary_geojson list to Shapely Polygon."""
-                if boundary_list is None or not isinstance(boundary_list, list):
-                    return None
-                try:
-                    # boundary_list is [[lon, lat], [lon, lat], ...]
-                    coords = list(boundary_list)
-                    if len(coords) < 3:
-                        return None
-                    # Close the polygon
-                    if coords[0] != coords[-1]:
-                        coords.append(coords[0])
-                    return Polygon(coords)
-                except:
-                    return None
-            
-            scored_df_geom = scored_df.copy()
-            scored_df_geom['geometry'] = scored_df_geom['h3_boundary_geojson'].apply(boundary_to_polygon)
-            scored_df_geom = scored_df_geom[scored_df_geom['geometry'].notna()].copy()
-            
-        elif 'h3_index' in scored_df.columns:
-            # Reconstruct geometry from h3_index
-            def h3_to_polygon(h3_index):
-                """Convert H3 index to Shapely Polygon."""
-                import pandas as pd
-                if pd.isna(h3_index):
-                    return None
-                try:
-                    boundary = h3.cell_to_boundary(str(h3_index))
-                    # h3 returns (lat, lon), but Shapely needs (lon, lat)
-                    coords = [(lon, lat) for lat, lon in boundary]
-                    coords.append(coords[0])  # Close polygon
-                    return Polygon(coords)
-                except:
-                    return None
-            
-            scored_df_geom = scored_df.copy()
-            scored_df_geom['geometry'] = scored_df_geom['h3_index'].apply(h3_to_polygon)
-            scored_df_geom = scored_df_geom[scored_df_geom['geometry'].notna()].copy()
-        else:
-            print("Warning: No geometry information found. Skipping GeoJSON export.")
-            scored_df_geom = None
-        
-        if scored_df_geom is not None and len(scored_df_geom) > 0:
-            # Create GeoDataFrame
-            gdf = gpd.GeoDataFrame(scored_df_geom, geometry='geometry', crs='EPSG:4326')
-            
-            # Drop h3_boundary_geojson column if it exists (not needed in GeoJSON)
-            if 'h3_boundary_geojson' in gdf.columns:
-                gdf = gdf.drop(columns=['h3_boundary_geojson'])
-            
-            # Ensure essential columns are present and have correct data types
-            # Convert numeric columns to appropriate types to reduce file size
-            numeric_cols = ['ph', 'soil_moisture', 'soc', 'suitability_score', 'biochar_suitability_score']
-            for col in numeric_cols:
-                if col in gdf.columns:
-                    # Convert to float32 to save memory (if not already numeric)
-                    if gdf[col].dtype == 'object':
-                        gdf[col] = pd.to_numeric(gdf[col], errors='coerce')
-                    elif gdf[col].dtype == 'float64':
-                        gdf[col] = gdf[col].astype('float32')
-            
-            # Ensure h3_index is string type
-            if 'h3_index' in gdf.columns:
-                gdf['h3_index'] = gdf['h3_index'].astype(str)
-            
-            # Validate geometries before saving
-            invalid_count = gdf['geometry'].isna().sum()
-            if invalid_count > 0:
-                print(f"Warning: {invalid_count} rows with invalid geometry. Filtering them out.")
-                gdf = gdf[gdf['geometry'].notna()].copy()
-            
-            # Save as GeoJSON with proper encoding
-            try:
-                gdf.to_file(geojson_path, driver='GeoJSON')
-                file_size_mb = geojson_path.stat().st_size / (1024 * 1024)
-                print(f"GeoJSON file saved to: {geojson_path}")
-                print(f"  Features: {len(gdf):,} hexagons")
-                print(f"  File size: {file_size_mb:.2f} MB")
-                print(f"  Columns: {', '.join([c for c in gdf.columns if c != 'geometry'])}")
-            except Exception as e:
-                print(f"Error saving GeoJSON: {e}")
-                import traceback
-                traceback.print_exc()
-        else:
-            print("Warning: Could not create GeoJSON - no valid geometry found.")
-    except ImportError:
-        print("Warning: geopandas not available. Skipping GeoJSON export.")
-    except Exception as e:
-        print(f"Warning: Could not save GeoJSON file: {e}")
     
     # Step 6: Output biochar suitability map
     print("\nCreating biochar suitability map...")
@@ -441,18 +346,24 @@ def main():
     biochar_map_path = output_dir / "biochar_suitability_map.html"
     suitability_map_path = output_dir / "suitability_map.html"  # For Streamlit compatibility
     
-    create_biochar_suitability_map(
-        df=scored_df,
-        output_path=biochar_map_path,
-        max_file_size_mb=100.0,
-        use_h3=True,
-        center_lat=center_lat,
-        center_lon=center_lon,
-        zoom_start=zoom
-    )
-    
-    # Also save a copy with the name Streamlit expects
-    shutil.copy2(biochar_map_path, suitability_map_path)
+    try:
+        create_biochar_suitability_map(
+            df=scored_df,
+            output_path=biochar_map_path,
+            max_file_size_mb=100.0,
+            use_h3=True,
+            center_lat=center_lat,
+            center_lon=center_lon,
+            zoom_start=zoom
+        )
+        
+        # Also save a copy with the name Streamlit expects
+        shutil.copy2(biochar_map_path, suitability_map_path)
+    except Exception as e:
+        print(f"Error creating biochar map: {e}")
+        import traceback
+        traceback.print_exc()
+        print("  Skipping map generation.")
     
     print(f"\nBiochar suitability map saved to: {biochar_map_path}")
     print(f"Suitability map (Streamlit) saved to: {suitability_map_path}")
