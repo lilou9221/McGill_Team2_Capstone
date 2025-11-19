@@ -254,34 +254,22 @@ if run_btn:
                 gdf = gpd.GeoDataFrame(df_with_geom, geometry='geometry', crs='EPSG:4326')
                 st.success(f"Reconstructed geometry for {len(gdf):,} hexagons from CSV.")
         
-        # Verify and map required columns (handle variations in column names)
-        # Use the same column detection logic as the suitability scoring function
-        column_mapping = {}
-        required_cols = {
-            'h3_index': ['h3_index', 'h3', 'hex_id'],
-            'ph': ['ph', 'soil_ph', 'soil_pH', 'pH', 'soil_pH_res_250_b0', 'soil_pH_res_250_b10'],
-            'soil_moisture': ['soil_moisture', 'moisture', 'soil_moisture_percent', 'sm_surface'],
-            'soc': ['soc', 'soil_organic_carbon', 'soil_organic_carbon_percent', 'organic_carbon', 
-                    'SOC_res_250_b0', 'SOC_res_250_b10', 'soil_organic'],
-            'suitability_score': ['suitability_score', 'biochar_suitability_score', 'score']
-        }
-        
         # Helper function to find column (case-insensitive, partial match)
-        def find_column(target_name, possible_names):
+        def find_column(df, target_name, possible_names):
             """Find column name in DataFrame, trying exact match first, then case-insensitive, then partial match."""
             # First try exact matches
             for name in possible_names:
-                if name in gdf.columns:
+                if name in df.columns:
                     return name
             
             # Then try case-insensitive
-            gdf_cols_lower = {col.lower(): col for col in gdf.columns}
+            df_cols_lower = {col.lower(): col for col in df.columns}
             for name in possible_names:
-                if name.lower() in gdf_cols_lower:
-                    return gdf_cols_lower[name.lower()]
+                if name.lower() in df_cols_lower:
+                    return df_cols_lower[name.lower()]
             
             # Then try partial match (for columns like "SOC_res_250_b0 (g/kg)")
-            for col in gdf.columns:
+            for col in df.columns:
                 col_lower = col.lower()
                 for name in possible_names:
                     if name.lower() in col_lower and 'score' not in col_lower and col_lower not in ['lon', 'lat', 'h3_index']:
@@ -289,35 +277,19 @@ if run_btn:
             
             return None
         
-        for target_col, possible_names in required_cols.items():
-            found_col = find_column(target_col, possible_names)
-            if found_col:
-                if target_col != found_col:
-                    # Map original name to target name
-                    column_mapping[found_col] = target_col
-            else:
-                st.warning(f"Could not find column for '{target_col}'. Available columns: {list(gdf.columns)}")
-                # For ph, soil_moisture, soc - create placeholder columns with NaN if missing
-                if target_col in ['ph', 'soil_moisture', 'soc']:
-                    gdf[target_col] = np.nan
-                    st.info(f"Created placeholder column '{target_col}' with NaN values. Maps may not display correctly.")
-                else:
-                    st.error(f"Missing required column: {target_col}")
-                    st.stop()
-        
-        # Rename columns to standard names if needed
-        if column_mapping:
-            gdf = gdf.rename(columns=column_mapping)
-        
         # Ensure geometry column exists
         if 'geometry' not in gdf.columns:
             st.error("Missing 'geometry' column. Cannot create maps.")
             st.stop()
         
         # Calculate map center and zoom from geometry
-        bounds = gdf.total_bounds
-        center_lat = (bounds[1] + bounds[3]) / 2
-        center_lon = (bounds[0] + bounds[2]) / 2
+        try:
+            bounds = gdf.total_bounds
+            center_lat = (bounds[1] + bounds[3]) / 2
+            center_lon = (bounds[0] + bounds[2]) / 2
+        except:
+            center_lat = -13.0
+            center_lon = -56.0
         
         # Load biochar database and generate recommendations
         biochar_db_path = PROJECT_ROOT / "data" / "pyrolysis" / "Dataset_feedstock_ML.xlsx"
@@ -488,11 +460,21 @@ if run_btn:
             st.caption("Diverging color scheme: Red indicates acidic soils (<5.5), yellow indicates neutral (6.5-7.5), blue indicates alkaline soils (>7.5).")
             
             try:
+                # Work with a copy to avoid modifying the original
+                gdf_ph = gdf.copy()
+                
+                # Find and map ph column
+                ph_col_name = find_column(gdf_ph, 'ph', ['ph', 'soil_ph', 'soil_pH', 'pH', 'soil_pH_res_250_b0', 'soil_pH_res_250_b10'])
+                if ph_col_name and ph_col_name != 'ph':
+                    gdf_ph['ph'] = gdf_ph[ph_col_name]
+                elif not ph_col_name or 'ph' not in gdf_ph.columns:
+                    gdf_ph['ph'] = np.nan
+                
                 # Check if ph column exists and has valid data
-                if 'ph' not in gdf.columns:
-                    st.error("pH column not found in data.")
+                if 'ph' not in gdf_ph.columns or gdf_ph['ph'].isna().all():
+                    st.warning("No pH data available in the dataset.")
                 else:
-                    ph_data = gdf['ph'].dropna()
+                    ph_data = gdf_ph['ph'].dropna()
                     if len(ph_data) == 0:
                         st.warning("No valid pH data available.")
                     else:
@@ -544,13 +526,14 @@ if run_btn:
                                         'fillOpacity': 0.3
                                     }
                             
-                            # Create GeoJSON layer - only include rows with valid geometry
-                            gdf_ph = gdf[['ph', 'h3_index', 'geometry']].copy()
-                            gdf_ph = gdf_ph[gdf_ph['geometry'].notna()].copy()
+                            # Create GeoJSON layer - only include rows with valid geometry and ph data
+                            gdf_ph_map = gdf_ph[['ph', 'h3_index', 'geometry']].copy()
+                            gdf_ph_map = gdf_ph_map[gdf_ph_map['geometry'].notna()].copy()
+                            gdf_ph_map = gdf_ph_map[gdf_ph_map['ph'].notna()].copy()
                             
-                            if len(gdf_ph) > 0:
+                            if len(gdf_ph_map) > 0:
                                 folium.GeoJson(
-                                    gdf_ph.to_json(),
+                                    gdf_ph_map.to_json(),
                                     style_function=style_function_ph,
                                     tooltip=folium.GeoJsonTooltip(
                                         fields=['h3_index', 'ph'],
@@ -573,22 +556,25 @@ if run_btn:
                         
                         with col_stats:
                             st.markdown("**Statistics**")
-                            ph_stats = gdf['ph'].describe()
-                            st.metric("Mean", f"{ph_stats['mean']:.2f}")
-                            st.metric("Min", f"{ph_stats['min']:.2f}")
-                            st.metric("Max", f"{ph_stats['max']:.2f}")
-                            st.metric("Std Dev", f"{ph_stats['std']:.2f}")
-                            
-                            # Histogram
-                            import matplotlib.pyplot as plt
-                            fig, ax = plt.subplots(figsize=(3, 2))
-                            ax.hist(ph_data, bins=20, color='#4575b4', edgecolor='black', alpha=0.7)
-                            ax.set_xlabel('pH')
-                            ax.set_ylabel('Frequency')
-                            ax.set_title('pH Distribution')
-                            plt.tight_layout()
-                            st.pyplot(fig, use_container_width=True)
-                            plt.close()
+                            try:
+                                ph_stats = gdf_ph['ph'].describe()
+                                st.metric("Mean", f"{ph_stats['mean']:.2f}")
+                                st.metric("Min", f"{ph_stats['min']:.2f}")
+                                st.metric("Max", f"{ph_stats['max']:.2f}")
+                                st.metric("Std Dev", f"{ph_stats['std']:.2f}")
+                                
+                                # Histogram
+                                import matplotlib.pyplot as plt
+                                fig, ax = plt.subplots(figsize=(3, 2))
+                                ax.hist(ph_data, bins=20, color='#4575b4', edgecolor='black', alpha=0.7)
+                                ax.set_xlabel('pH')
+                                ax.set_ylabel('Frequency')
+                                ax.set_title('pH Distribution')
+                                plt.tight_layout()
+                                st.pyplot(fig, use_container_width=True)
+                                plt.close()
+                            except Exception as e:
+                                st.warning(f"Could not generate statistics: {e}")
             except Exception as e:
                 st.error(f"Error creating pH map: {e}")
                 import traceback
@@ -599,11 +585,21 @@ if run_btn:
             st.caption("Sequential color scheme: Beige/yellow indicates dry soils, dark blue indicates wet soils. Higher moisture generally requires different biochar properties.")
             
             try:
+                # Work with a copy to avoid modifying the original
+                gdf_moisture = gdf.copy()
+                
+                # Find and map soil_moisture column
+                moisture_col_name = find_column(gdf_moisture, 'soil_moisture', ['soil_moisture', 'moisture', 'soil_moisture_percent', 'sm_surface'])
+                if moisture_col_name and moisture_col_name != 'soil_moisture':
+                    gdf_moisture['soil_moisture'] = gdf_moisture[moisture_col_name]
+                elif not moisture_col_name or 'soil_moisture' not in gdf_moisture.columns:
+                    gdf_moisture['soil_moisture'] = np.nan
+                
                 # Check if soil_moisture column exists and has valid data
-                if 'soil_moisture' not in gdf.columns:
-                    st.error("Soil moisture column not found in data.")
+                if 'soil_moisture' not in gdf_moisture.columns or gdf_moisture['soil_moisture'].isna().all():
+                    st.warning("No soil moisture data available in the dataset.")
                 else:
-                    moisture_data = gdf['soil_moisture'].dropna()
+                    moisture_data = gdf_moisture['soil_moisture'].dropna()
                     if len(moisture_data) == 0:
                         st.warning("No valid soil moisture data available.")
                     else:
@@ -654,13 +650,14 @@ if run_btn:
                                         'fillOpacity': 0.3
                                     }
                             
-                            # Create GeoJSON layer - only include rows with valid geometry
-                            gdf_moisture = gdf[['soil_moisture', 'h3_index', 'geometry']].copy()
-                            gdf_moisture = gdf_moisture[gdf_moisture['geometry'].notna()].copy()
+                            # Create GeoJSON layer - only include rows with valid geometry and moisture data
+                            gdf_moisture_map = gdf_moisture[['soil_moisture', 'h3_index', 'geometry']].copy()
+                            gdf_moisture_map = gdf_moisture_map[gdf_moisture_map['geometry'].notna()].copy()
+                            gdf_moisture_map = gdf_moisture_map[gdf_moisture_map['soil_moisture'].notna()].copy()
                             
-                            if len(gdf_moisture) > 0:
+                            if len(gdf_moisture_map) > 0:
                                 folium.GeoJson(
-                                    gdf_moisture.to_json(),
+                                    gdf_moisture_map.to_json(),
                                     style_function=style_function_moisture,
                                     tooltip=folium.GeoJsonTooltip(
                                         fields=['h3_index', 'soil_moisture'],
@@ -681,20 +678,23 @@ if run_btn:
                         
                         with col_stats:
                             st.markdown("**Statistics**")
-                            moisture_stats = gdf['soil_moisture'].describe()
-                            st.metric("Mean", f"{moisture_stats['mean']:.2f}%")
-                            st.metric("Min", f"{moisture_stats['min']:.2f}%")
-                            st.metric("Max", f"{moisture_stats['max']:.2f}%")
-                            st.metric("Std Dev", f"{moisture_stats['std']:.2f}%")
-                            
-                            fig, ax = plt.subplots(figsize=(3, 2))
-                            ax.hist(moisture_data, bins=20, color='#2c7fb8', edgecolor='black', alpha=0.7)
-                            ax.set_xlabel('Moisture (%)')
-                            ax.set_ylabel('Frequency')
-                            ax.set_title('Moisture Distribution')
-                            plt.tight_layout()
-                            st.pyplot(fig, use_container_width=True)
-                            plt.close()
+                            try:
+                                moisture_stats = gdf_moisture['soil_moisture'].describe()
+                                st.metric("Mean", f"{moisture_stats['mean']:.2f}%")
+                                st.metric("Min", f"{moisture_stats['min']:.2f}%")
+                                st.metric("Max", f"{moisture_stats['max']:.2f}%")
+                                st.metric("Std Dev", f"{moisture_stats['std']:.2f}%")
+                                
+                                fig, ax = plt.subplots(figsize=(3, 2))
+                                ax.hist(moisture_data, bins=20, color='#2c7fb8', edgecolor='black', alpha=0.7)
+                                ax.set_xlabel('Moisture (%)')
+                                ax.set_ylabel('Frequency')
+                                ax.set_title('Moisture Distribution')
+                                plt.tight_layout()
+                                st.pyplot(fig, use_container_width=True)
+                                plt.close()
+                            except Exception as e:
+                                st.warning(f"Could not generate statistics: {e}")
             except Exception as e:
                 st.error(f"Error creating moisture map: {e}")
                 import traceback
@@ -705,11 +705,22 @@ if run_btn:
             st.caption("Sequential color scheme: Beige indicates low SOC, dark green/brown indicates high SOC. Areas with SOC >5% typically don't require biochar application.")
             
             try:
+                # Work with a copy to avoid modifying the original
+                gdf_soc = gdf.copy()
+                
+                # Find and map soc column
+                soc_col_name = find_column(gdf_soc, 'soc', ['soc', 'soil_organic_carbon', 'soil_organic_carbon_percent', 'organic_carbon', 
+                                                             'SOC_res_250_b0', 'SOC_res_250_b10', 'soil_organic'])
+                if soc_col_name and soc_col_name != 'soc':
+                    gdf_soc['soc'] = gdf_soc[soc_col_name]
+                elif not soc_col_name or 'soc' not in gdf_soc.columns:
+                    gdf_soc['soc'] = np.nan
+                
                 # Check if soc column exists and has valid data
-                if 'soc' not in gdf.columns:
-                    st.error("SOC column not found in data.")
+                if 'soc' not in gdf_soc.columns or gdf_soc['soc'].isna().all():
+                    st.warning("No SOC data available in the dataset.")
                 else:
-                    soc_data = gdf['soc'].dropna()
+                    soc_data = gdf_soc['soc'].dropna()
                     if len(soc_data) == 0:
                         st.warning("No valid SOC data available.")
                     else:
@@ -760,13 +771,14 @@ if run_btn:
                                         'fillOpacity': 0.3
                                     }
                             
-                            # Create GeoJSON layer - only include rows with valid geometry
-                            gdf_soc = gdf[['soc', 'h3_index', 'geometry']].copy()
-                            gdf_soc = gdf_soc[gdf_soc['geometry'].notna()].copy()
+                            # Create GeoJSON layer - only include rows with valid geometry and soc data
+                            gdf_soc_map = gdf_soc[['soc', 'h3_index', 'geometry']].copy()
+                            gdf_soc_map = gdf_soc_map[gdf_soc_map['geometry'].notna()].copy()
+                            gdf_soc_map = gdf_soc_map[gdf_soc_map['soc'].notna()].copy()
                             
-                            if len(gdf_soc) > 0:
+                            if len(gdf_soc_map) > 0:
                                 folium.GeoJson(
-                                    gdf_soc.to_json(),
+                                    gdf_soc_map.to_json(),
                                     style_function=style_function_soc,
                                     tooltip=folium.GeoJsonTooltip(
                                         fields=['h3_index', 'soc'],
@@ -787,20 +799,23 @@ if run_btn:
                         
                         with col_stats:
                             st.markdown("**Statistics**")
-                            soc_stats = gdf['soc'].describe()
-                            st.metric("Mean", f"{soc_stats['mean']:.2f}%")
-                            st.metric("Min", f"{soc_stats['min']:.2f}%")
-                            st.metric("Max", f"{soc_stats['max']:.2f}%")
-                            st.metric("Std Dev", f"{soc_stats['std']:.2f}%")
-                            
-                            fig, ax = plt.subplots(figsize=(3, 2))
-                            ax.hist(soc_data, bins=20, color='#d95f0e', edgecolor='black', alpha=0.7)
-                            ax.set_xlabel('SOC (%)')
-                            ax.set_ylabel('Frequency')
-                            ax.set_title('SOC Distribution')
-                            plt.tight_layout()
-                            st.pyplot(fig, use_container_width=True)
-                            plt.close()
+                            try:
+                                soc_stats = gdf_soc['soc'].describe()
+                                st.metric("Mean", f"{soc_stats['mean']:.2f}%")
+                                st.metric("Min", f"{soc_stats['min']:.2f}%")
+                                st.metric("Max", f"{soc_stats['max']:.2f}%")
+                                st.metric("Std Dev", f"{soc_stats['std']:.2f}%")
+                                
+                                fig, ax = plt.subplots(figsize=(3, 2))
+                                ax.hist(soc_data, bins=20, color='#d95f0e', edgecolor='black', alpha=0.7)
+                                ax.set_xlabel('SOC (%)')
+                                ax.set_ylabel('Frequency')
+                                ax.set_title('SOC Distribution')
+                                plt.tight_layout()
+                                st.pyplot(fig, use_container_width=True)
+                                plt.close()
+                            except Exception as e:
+                                st.warning(f"Could not generate statistics: {e}")
             except Exception as e:
                 st.error(f"Error creating SOC map: {e}")
                 import traceback
