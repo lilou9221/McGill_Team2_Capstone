@@ -19,6 +19,11 @@ def get_ph_color_rgb(ph_value: float, min_ph: float, max_ph: float) -> tuple:
     """
     Get RGB color for pH value using a diverging color scheme (red = acidic, yellow = neutral, blue = alkaline).
     
+    Color mapping:
+    - Red for acidic soils (<5.5)
+    - Yellow for neutral (~7)
+    - Blue for alkaline soils (>7.5)
+    
     Parameters
     ----------
     ph_value : float
@@ -36,30 +41,41 @@ def get_ph_color_rgb(ph_value: float, min_ph: float, max_ph: float) -> tuple:
     if np.isnan(ph_value) or min_ph == max_ph:
         return (128, 128, 128)  # Gray for NaN or constant values
     
-    # Normalize to 0-1 range
-    normalized = (ph_value - min_ph) / (max_ph - min_ph)
-    normalized = max(0.0, min(1.0, normalized))  # Clamp to [0, 1]
+    # Map pH to color based on actual pH values, not normalized range
+    # Red for acidic (<5.5), Yellow for neutral (~7), Blue for alkaline (>7.5)
     
-    # Diverging color scheme: Red (acidic <5.5) -> Yellow (neutral ~7) -> Blue (alkaline >7.5)
-    # Using RdYlBu_r color scheme (reversed: red to blue)
-    if normalized < 0.33:
-        # Red to yellow (acidic to neutral)
-        ratio = normalized / 0.33  # 0 to 1
-        r = int(220 - (220 - 255) * ratio)  # 220 -> 255 (red to yellow-red)
-        g = int(20 - (20 - 255) * ratio)    # 20 -> 255
-        b = int(60 - (60 - 0) * ratio)      # 60 -> 0
-    elif normalized < 0.67:
-        # Yellow to light blue (neutral to slightly alkaline)
-        ratio = (normalized - 0.33) / 0.34  # 0 to 1
-        r = int(255 - (255 - 173) * ratio)  # 255 -> 173
-        g = int(255 - (255 - 216) * ratio)  # 255 -> 216
-        b = int(0 + (230 - 0) * ratio)      # 0 -> 230
+    if ph_value < 5.5:
+        # Acidic: Red (dark red to red)
+        # Scale from dark red (pH ~4) to red (pH 5.5)
+        ratio = (ph_value - 4.0) / 1.5 if ph_value >= 4.0 else 0.0
+        ratio = max(0.0, min(1.0, ratio))
+        r = int(139 + (255 - 139) * ratio)  # 139 (dark red) -> 255 (red)
+        g = int(0)
+        b = int(0)
+    elif ph_value < 7.0:
+        # Slightly acidic to neutral: Red-orange to yellow
+        # Scale from red (pH 5.5) to yellow (pH 7.0)
+        ratio = (ph_value - 5.5) / 1.5  # 0 to 1
+        ratio = max(0.0, min(1.0, ratio))
+        r = int(255 - (255 - 255) * ratio)    # 255 -> 255 (keep red high)
+        g = int(0 + (255 - 0) * ratio)        # 0 -> 255 (increase green)
+        b = int(0)                             # 0 (no blue)
+    elif ph_value < 7.5:
+        # Neutral to slightly alkaline: Yellow to light blue
+        # Scale from yellow (pH 7.0) to light blue (pH 7.5)
+        ratio = (ph_value - 7.0) / 0.5  # 0 to 1
+        ratio = max(0.0, min(1.0, ratio))
+        r = int(255 - (255 - 173) * ratio)    # 255 -> 173
+        g = int(255 - (255 - 216) * ratio)    # 255 -> 216
+        b = int(0 + (230 - 0) * ratio)        # 0 -> 230
     else:
-        # Light blue to dark blue (alkaline)
-        ratio = (normalized - 0.67) / 0.33  # 0 to 1
-        r = int(173 - (173 - 49) * ratio)   # 173 -> 49
-        g = int(216 - (216 - 54) * ratio)   # 216 -> 54
-        b = int(230 - (230 - 149) * ratio)   # 230 -> 149
+        # Alkaline: Blue (light blue to dark blue)
+        # Scale from light blue (pH 7.5) to dark blue (pH 9+)
+        ratio = (ph_value - 7.5) / 1.5 if ph_value <= 9.0 else 1.0
+        ratio = max(0.0, min(1.0, ratio))
+        r = int(173 - (173 - 49) * ratio)     # 173 -> 49
+        g = int(216 - (216 - 54) * ratio)     # 216 -> 54
+        b = int(230 - (230 - 149) * ratio)    # 230 -> 149
     
     return (r, g, b)
 
