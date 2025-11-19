@@ -186,14 +186,14 @@ if run_btn:
     # INITIAL RESULTS TABLE
     # ============================================================
     st.subheader("Suitability Scores")
-    st.dataframe(df.sort_values("suitability_score", ascending=False), use_container_width=True, hide_index=True)
+    st.dataframe(df.sort_values("suitability_score", ascending=False), width='stretch', hide_index=True)
 
     st.download_button(
         label="Download Results as CSV",
         data=df.to_csv(index=False).encode(),
         file_name="biochar_suitability_scores.csv",
         mime="text/csv",
-        use_container_width=True
+        use_container_width=True  # Note: width parameter not yet available for download_button
     )
 
     # ============================================================
@@ -532,18 +532,24 @@ if run_btn:
                             gdf_ph_map = gdf_ph_map[gdf_ph_map['ph'].notna()].copy()
                             
                             if len(gdf_ph_map) > 0:
-                                folium.GeoJson(
-                                    gdf_ph_map.to_json(),
-                                    style_function=style_function_ph,
-                                    tooltip=folium.GeoJsonTooltip(
-                                        fields=['h3_index', 'ph'],
-                                        aliases=['H3:', 'pH:'],
-                                        localize=True
-                                    )
-                                ).add_to(m_ph)
+                                try:
+                                    folium.GeoJson(
+                                        gdf_ph_map.to_json(),
+                                        style_function=style_function_ph,
+                                        tooltip=folium.GeoJsonTooltip(
+                                            fields=['h3_index', 'ph'],
+                                            aliases=['H3:', 'pH:'],
+                                            localize=True
+                                        )
+                                    ).add_to(m_ph)
+                                except Exception as e:
+                                    st.warning(f"Could not add GeoJSON layer: {e}")
                             
-                            ph_colormap.add_to(m_ph)
-                            plugins.Fullscreen().add_to(m_ph)
+                            try:
+                                ph_colormap.add_to(m_ph)
+                                plugins.Fullscreen().add_to(m_ph)
+                            except Exception as e:
+                                st.warning(f"Could not add colormap/plugins: {e}")
                             
                             # Convert to HTML and display
                             try:
@@ -551,8 +557,13 @@ if run_btn:
                                 st_folium(m_ph, width=700, height=750)
                             except ImportError:
                                 # Fallback if streamlit_folium not available
-                                html_str = m_ph._repr_html_()
-                                st.components.v1.html(html_str, height=750, scrolling=False)
+                                try:
+                                    html_str = m_ph._repr_html_()
+                                    st.components.v1.html(html_str, height=750, scrolling=False)
+                                except Exception as e:
+                                    st.error(f"Could not render map: {e}")
+                                    import traceback
+                                    st.code(traceback.format_exc())
                         
                         with col_stats:
                             st.markdown("**Statistics**")
@@ -571,7 +582,7 @@ if run_btn:
                                 ax.set_ylabel('Frequency')
                                 ax.set_title('pH Distribution')
                                 plt.tight_layout()
-                                st.pyplot(fig, use_container_width=True)
+                                st.pyplot(fig)
                                 plt.close()
                             except Exception as e:
                                 st.warning(f"Could not generate statistics: {e}")
@@ -656,25 +667,36 @@ if run_btn:
                             gdf_moisture_map = gdf_moisture_map[gdf_moisture_map['soil_moisture'].notna()].copy()
                             
                             if len(gdf_moisture_map) > 0:
-                                folium.GeoJson(
-                                    gdf_moisture_map.to_json(),
-                                    style_function=style_function_moisture,
-                                    tooltip=folium.GeoJsonTooltip(
-                                        fields=['h3_index', 'soil_moisture'],
-                                        aliases=['H3:', 'Moisture (%):'],
-                                        localize=True
-                                    )
-                                ).add_to(m_moisture)
+                                try:
+                                    folium.GeoJson(
+                                        gdf_moisture_map.to_json(),
+                                        style_function=style_function_moisture,
+                                        tooltip=folium.GeoJsonTooltip(
+                                            fields=['h3_index', 'soil_moisture'],
+                                            aliases=['H3:', 'Moisture (%):'],
+                                            localize=True
+                                        )
+                                    ).add_to(m_moisture)
+                                except Exception as e:
+                                    st.warning(f"Could not add GeoJSON layer: {e}")
                             
-                            moisture_colormap.add_to(m_moisture)
-                            plugins.Fullscreen().add_to(m_moisture)
+                            try:
+                                moisture_colormap.add_to(m_moisture)
+                                plugins.Fullscreen().add_to(m_moisture)
+                            except Exception as e:
+                                st.warning(f"Could not add colormap/plugins: {e}")
                             
                             try:
                                 from streamlit_folium import st_folium
                                 st_folium(m_moisture, width=700, height=750)
                             except ImportError:
-                                html_str = m_moisture._repr_html_()
-                                st.components.v1.html(html_str, height=750, scrolling=False)
+                                try:
+                                    html_str = m_moisture._repr_html_()
+                                    st.components.v1.html(html_str, height=750, scrolling=False)
+                                except Exception as e:
+                                    st.error(f"Could not render map: {e}")
+                                    import traceback
+                                    st.code(traceback.format_exc())
                         
                         with col_stats:
                             st.markdown("**Statistics**")
@@ -691,7 +713,7 @@ if run_btn:
                                 ax.set_ylabel('Frequency')
                                 ax.set_title('Moisture Distribution')
                                 plt.tight_layout()
-                                st.pyplot(fig, use_container_width=True)
+                                st.pyplot(fig)
                                 plt.close()
                             except Exception as e:
                                 st.warning(f"Could not generate statistics: {e}")
@@ -777,25 +799,36 @@ if run_btn:
                             gdf_soc_map = gdf_soc_map[gdf_soc_map['soc'].notna()].copy()
                             
                             if len(gdf_soc_map) > 0:
-                                folium.GeoJson(
-                                    gdf_soc_map.to_json(),
-                                    style_function=style_function_soc,
-                                    tooltip=folium.GeoJsonTooltip(
-                                        fields=['h3_index', 'soc'],
-                                        aliases=['H3:', 'SOC (%):'],
-                                        localize=True
-                                    )
-                                ).add_to(m_soc)
+                                try:
+                                    folium.GeoJson(
+                                        gdf_soc_map.to_json(),
+                                        style_function=style_function_soc,
+                                        tooltip=folium.GeoJsonTooltip(
+                                            fields=['h3_index', 'soc'],
+                                            aliases=['H3:', 'SOC (%):'],
+                                            localize=True
+                                        )
+                                    ).add_to(m_soc)
+                                except Exception as e:
+                                    st.warning(f"Could not add GeoJSON layer: {e}")
                             
-                            soc_colormap.add_to(m_soc)
-                            plugins.Fullscreen().add_to(m_soc)
+                            try:
+                                soc_colormap.add_to(m_soc)
+                                plugins.Fullscreen().add_to(m_soc)
+                            except Exception as e:
+                                st.warning(f"Could not add colormap/plugins: {e}")
                             
                             try:
                                 from streamlit_folium import st_folium
                                 st_folium(m_soc, width=700, height=750)
                             except ImportError:
-                                html_str = m_soc._repr_html_()
-                                st.components.v1.html(html_str, height=750, scrolling=False)
+                                try:
+                                    html_str = m_soc._repr_html_()
+                                    st.components.v1.html(html_str, height=750, scrolling=False)
+                                except Exception as e:
+                                    st.error(f"Could not render map: {e}")
+                                    import traceback
+                                    st.code(traceback.format_exc())
                         
                         with col_stats:
                             st.markdown("**Statistics**")
@@ -812,7 +845,7 @@ if run_btn:
                                 ax.set_ylabel('Frequency')
                                 ax.set_title('SOC Distribution')
                                 plt.tight_layout()
-                                st.pyplot(fig, use_container_width=True)
+                                st.pyplot(fig)
                                 plt.close()
                             except Exception as e:
                                 st.warning(f"Could not generate statistics: {e}")
@@ -840,7 +873,7 @@ if run_btn:
             display_cols.extend(['Recommended Feedstock', 'Recommendation Reason'])
         display_cols.extend([col for col in df.columns if col not in display_cols and col != 'h3_index'])
         
-        st.dataframe(df[display_cols].sort_values("suitability_score", ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(df[display_cols].sort_values("suitability_score", ascending=False), width='stretch', hide_index=True)
         
         # Update download button
         st.download_button(
@@ -848,7 +881,7 @@ if run_btn:
             data=df[display_cols].to_csv(index=False).encode(),
             file_name="biochar_suitability_scores_with_recommendations.csv",
             mime="text/csv",
-            use_container_width=True
+            use_container_width=True  # Note: width parameter not yet available for download_button
         )
         
     except ImportError as e:
