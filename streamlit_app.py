@@ -210,20 +210,22 @@ if run_btn:
         import h3
         from shapely.geometry import Polygon
         
-        # Use the same df that was already loaded (same data source as suitability map)
-        # Reconstruct geometry from h3_index if needed
-        with st.spinner("Preparing hexagon geometry for maps..."):
-            # Check if h3_index exists in the already-loaded df
-            if 'h3_index' not in df.columns:
-                st.error("Data missing 'h3_index' column. Cannot create maps.")
-                st.stop()
-            
-            # Check if geometry already exists (from GeoJSON)
-            if 'geometry' in df.columns and hasattr(df, 'geometry'):
-                # Already a GeoDataFrame with geometry
-                gdf = df.copy() if isinstance(df, gpd.GeoDataFrame) else gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
-            else:
-                # Reconstruct geometry from h3_index (same logic as suitability map uses)
+        # Load GeoJSON file (preferred - more efficient)
+        geojson_path = PROJECT_ROOT / config["data"]["processed"] / "hexagons_with_scores.geojson"
+        
+        if geojson_path.exists():
+            # Load GeoJSON directly (most efficient)
+            with st.spinner("Loading hexagon data from GeoJSON..."):
+                gdf = gpd.read_file(geojson_path)
+                st.success(f"Loaded {len(gdf):,} hexagons from GeoJSON.")
+        else:
+            # Fallback: reconstruct from CSV
+            with st.spinner("Reconstructing hexagon geometry from CSV..."):
+                if 'h3_index' not in df.columns:
+                    st.error("Data missing 'h3_index' column. Cannot create maps.")
+                    st.stop()
+                
+                # Reconstruct geometry from h3_index
                 def h3_to_polygon(h3_index):
                     """Convert H3 index to Shapely Polygon."""
                     try:
@@ -250,8 +252,7 @@ if run_btn:
                 
                 # Convert to GeoDataFrame
                 gdf = gpd.GeoDataFrame(df_with_geom, geometry='geometry', crs='EPSG:4326')
-                
-                st.success(f"Prepared {len(gdf):,} hexagons for mapping.")
+                st.success(f"Reconstructed geometry for {len(gdf):,} hexagons from CSV.")
         
         # Verify and map required columns (handle variations in column names)
         # Use the same column detection logic as the suitability scoring function
@@ -501,26 +502,35 @@ if run_btn:
                     caption='Soil pH'
                 )
                 
-                # Add hexagons to map
-                for idx, row in gdf.iterrows():
-                    if pd.notna(row['ph']) and row.geometry is not None:
-                        ph_val = float(row['ph'])
-                        color = ph_colormap(ph_val)
-                        h3_idx = str(row['h3_index'])
-                        
-                        def make_style(c):
-                            return lambda feature: {
-                                'fillColor': c,
-                                'color': 'black',
-                                'weight': 0.5,
-                                'fillOpacity': 0.7
-                            }
-                        
-                        folium.GeoJson(
-                            row.geometry.__geo_interface__,
-                            style_function=make_style(color),
-                            tooltip=folium.Tooltip(f"H3: {h3_idx}<br>pH: {ph_val:.2f}")
-                        ).add_to(m_ph)
+                # Add hexagons to map using GeoJson with style function
+                def style_function_ph(feature):
+                    """Style function for pH map."""
+                    ph_val = feature['properties'].get('ph')
+                    if pd.isna(ph_val):
+                        return {
+                            'fillColor': '#808080',
+                            'color': 'black',
+                            'weight': 0.5,
+                            'fillOpacity': 0.3
+                        }
+                    color = ph_colormap(float(ph_val))
+                    return {
+                        'fillColor': color,
+                        'color': 'black',
+                        'weight': 0.5,
+                        'fillOpacity': 0.7
+                    }
+                
+                # Create GeoJSON layer
+                folium.GeoJson(
+                    gdf[['ph', 'h3_index', 'geometry']].to_json(),
+                    style_function=style_function_ph,
+                    tooltip=folium.GeoJsonTooltip(
+                        fields=['h3_index', 'ph'],
+                        aliases=['H3:', 'pH:'],
+                        localize=True
+                    )
+                ).add_to(m_ph)
                 
                 ph_colormap.add_to(m_ph)
                 folium_static = plugins.Fullscreen().add_to(m_ph)
@@ -571,25 +581,35 @@ if run_btn:
                     caption='Soil Moisture (%)'
                 )
                 
-                for idx, row in gdf.iterrows():
-                    if pd.notna(row['soil_moisture']) and row.geometry is not None:
-                        moisture_val = float(row['soil_moisture'])
-                        color = moisture_colormap(moisture_val)
-                        h3_idx = str(row['h3_index'])
-                        
-                        def make_style(c):
-                            return lambda feature: {
-                                'fillColor': c,
-                                'color': 'black',
-                                'weight': 0.5,
-                                'fillOpacity': 0.7
-                            }
-                        
-                        folium.GeoJson(
-                            row.geometry.__geo_interface__,
-                            style_function=make_style(color),
-                            tooltip=folium.Tooltip(f"H3: {h3_idx}<br>Moisture: {moisture_val:.2f}%")
-                        ).add_to(m_moisture)
+                # Add hexagons to map using GeoJson with style function
+                def style_function_moisture(feature):
+                    """Style function for moisture map."""
+                    moisture_val = feature['properties'].get('soil_moisture')
+                    if pd.isna(moisture_val):
+                        return {
+                            'fillColor': '#808080',
+                            'color': 'black',
+                            'weight': 0.5,
+                            'fillOpacity': 0.3
+                        }
+                    color = moisture_colormap(float(moisture_val))
+                    return {
+                        'fillColor': color,
+                        'color': 'black',
+                        'weight': 0.5,
+                        'fillOpacity': 0.7
+                    }
+                
+                # Create GeoJSON layer
+                folium.GeoJson(
+                    gdf[['soil_moisture', 'h3_index', 'geometry']].to_json(),
+                    style_function=style_function_moisture,
+                    tooltip=folium.GeoJsonTooltip(
+                        fields=['h3_index', 'soil_moisture'],
+                        aliases=['H3:', 'Moisture (%):'],
+                        localize=True
+                    )
+                ).add_to(m_moisture)
                 
                 moisture_colormap.add_to(m_moisture)
                 plugins.Fullscreen().add_to(m_moisture)
@@ -636,25 +656,35 @@ if run_btn:
                     caption='SOC (%)'
                 )
                 
-                for idx, row in gdf.iterrows():
-                    if pd.notna(row['soc']) and row.geometry is not None:
-                        soc_val = float(row['soc'])
-                        color = soc_colormap(soc_val)
-                        h3_idx = str(row['h3_index'])
-                        
-                        def make_style(c):
-                            return lambda feature: {
-                                'fillColor': c,
-                                'color': 'black',
-                                'weight': 0.5,
-                                'fillOpacity': 0.7
-                            }
-                        
-                        folium.GeoJson(
-                            row.geometry.__geo_interface__,
-                            style_function=make_style(color),
-                            tooltip=folium.Tooltip(f"H3: {h3_idx}<br>SOC: {soc_val:.2f}%")
-                        ).add_to(m_soc)
+                # Add hexagons to map using GeoJson with style function
+                def style_function_soc(feature):
+                    """Style function for SOC map."""
+                    soc_val = feature['properties'].get('soc')
+                    if pd.isna(soc_val):
+                        return {
+                            'fillColor': '#808080',
+                            'color': 'black',
+                            'weight': 0.5,
+                            'fillOpacity': 0.3
+                        }
+                    color = soc_colormap(float(soc_val))
+                    return {
+                        'fillColor': color,
+                        'color': 'black',
+                        'weight': 0.5,
+                        'fillOpacity': 0.7
+                    }
+                
+                # Create GeoJSON layer
+                folium.GeoJson(
+                    gdf[['soc', 'h3_index', 'geometry']].to_json(),
+                    style_function=style_function_soc,
+                    tooltip=folium.GeoJsonTooltip(
+                        fields=['h3_index', 'soc'],
+                        aliases=['H3:', 'SOC (%):'],
+                        localize=True
+                    )
+                ).add_to(m_soc)
                 
                 soc_colormap.add_to(m_soc)
                 plugins.Fullscreen().add_to(m_soc)
