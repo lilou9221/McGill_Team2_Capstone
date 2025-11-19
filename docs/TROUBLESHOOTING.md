@@ -45,7 +45,7 @@ Or install specific packages:
 pip install earthengine-api rasterio pandas h3 pydeck shapely pyyaml pyarrow
 ```
 
-**Note**: `folium` is listed in `requirements.txt` for Streamlit compatibility but is not used in the main pipeline (which uses PyDeck exclusively).
+**Note**: The main pipeline uses PyDeck exclusively for map generation, working directly with CSV data.
 
 **Note**: `pyarrow>=10.0.0` is required for DataFrame caching (Parquet file support). This is automatically installed via `requirements.txt`, but if you encounter Parquet-related errors, ensure it's installed: `pip install pyarrow>=10.0.0`.
 
