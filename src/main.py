@@ -31,6 +31,7 @@ from src.analysis.suitability import merge_and_aggregate_soil_data
 from src.visualization.biochar_map import create_biochar_suitability_map
 from src.visualization.soc_map import create_soc_map
 from src.visualization.ph_map import create_ph_map
+from src.visualization.moisture_map import create_moisture_map
 from src.analysis.biochar_suitability import calculate_biochar_suitability_scores
 from src.utils.browser import open_html_in_browser
 
@@ -438,6 +439,39 @@ def main():
         traceback.print_exc()
         print("  Skipping pH map generation.")
     
+    # Step 9: Output soil moisture map
+    print("\nCreating soil moisture map...")
+    moisture_map_path = output_dir / "moisture_map.html"
+    moisture_map_streamlit_path = output_dir / "moisture_map_streamlit.html"  # For Streamlit compatibility
+    
+    try:
+        # Determine H3 resolution for moisture map (same logic as SOC and pH maps)
+        if area.use_full_state:
+            moisture_h3_resolution = 9  # Full state uses resolution 9 for moisture map
+        else:
+            moisture_h3_resolution = h3_resolution  # Use same resolution as suitability map for clipped area
+        
+        create_moisture_map(
+            processed_dir=processed_dir,
+            output_path=moisture_map_path,
+            h3_resolution=moisture_h3_resolution,
+            use_coords=not area.use_full_state,
+            center_lat=center_lat,
+            center_lon=center_lon,
+            zoom_start=zoom
+        )
+        
+        # Also save a copy with the name Streamlit expects
+        shutil.copy2(moisture_map_path, moisture_map_streamlit_path)
+        
+        print(f"Soil moisture map saved to: {moisture_map_path}")
+        print(f"Soil moisture map (Streamlit) saved to: {moisture_map_streamlit_path}")
+    except Exception as e:
+        print(f"Error creating soil moisture map: {e}")
+        import traceback
+        traceback.print_exc()
+        print("  Skipping soil moisture map generation.")
+    
     # Auto-open all maps if enabled
     if config.get("visualization", {}).get("auto_open_html", True):
         open_html_in_browser(biochar_map_path)
@@ -445,6 +479,8 @@ def main():
             open_html_in_browser(soc_map_path)
         if ph_map_path.exists():
             open_html_in_browser(ph_map_path)
+        if moisture_map_path.exists():
+            open_html_in_browser(moisture_map_path)
     
     print(f"\nAll maps saved to: {output_dir}")
     return 0
