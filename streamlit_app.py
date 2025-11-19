@@ -197,9 +197,9 @@ if run_btn:
     )
 
     # ============================================================
-    # TABS: Biochar Suitability, Soil Organic Carbon, and pH
+    # TABS: Biochar Suitability, Soil Organic Carbon, pH, and Soil Moisture
     # ============================================================
-    tab1, tab2, tab3 = st.tabs(["Biochar Suitability", "Soil Organic Carbon", "Soil pH"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Biochar Suitability", "Soil Organic Carbon", "Soil pH", "Soil Moisture"])
     
     with tab1:
         st.subheader("Interactive Suitability Map")
@@ -245,6 +245,24 @@ if run_btn:
                 st.components.v1.html(f.read(), height=750, scrolling=False)
         else:
             st.warning("pH map not generated. Please run the analysis first.")
+    
+    with tab4:
+        st.subheader("Soil Moisture Map")
+        st.markdown("""
+        <p style="color: #333; margin-bottom: 1rem;">
+            This map displays Soil Moisture values aggregated by H3 hexagons. 
+            Soil moisture is shown as a percentage (0-100%), converted from m³/m³ volume fraction. 
+            The color scheme uses a sequential scale: light brown/yellow for dry soils (low moisture), green for moderate moisture, and blue for wet soils (high moisture).
+        </p>
+        """, unsafe_allow_html=True)
+        
+        # Load pre-generated moisture map (created during analysis pipeline, same as suitability map)
+        moisture_map_path = PROJECT_ROOT / config["output"]["html"] / "moisture_map_streamlit.html"
+        if moisture_map_path.exists():
+            with open(moisture_map_path, "r", encoding="utf-8") as f:
+                st.components.v1.html(f.read(), height=750, scrolling=False)
+        else:
+            st.warning("Soil moisture map not generated. Please run the analysis first.")
 
 # ============================================================
 # FOOTER
