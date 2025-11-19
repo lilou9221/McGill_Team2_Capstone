@@ -45,20 +45,20 @@ def get_ph_color_rgb(ph_value: float, min_ph: float, max_ph: float) -> tuple:
     # Red for acidic (<5.5), Yellow for neutral (~7), Blue for alkaline (>7.5)
     
     if ph_value < 5.5:
-        # Acidic: Red (dark red to red)
-        # Scale from dark red (pH ~4) to red (pH 5.5)
+        # Acidic: Light orange-red to orange-yellow
+        # Scale from light orange-red (pH ~4) to orange-yellow (pH 5.5)
         ratio = (ph_value - 4.0) / 1.5 if ph_value >= 4.0 else 0.0
         ratio = max(0.0, min(1.0, ratio))
-        r = int(139 + (255 - 139) * ratio)  # 139 (dark red) -> 255 (red)
-        g = int(0)
-        b = int(0)
+        r = int(255)  # Keep red high
+        g = int(140 + (200 - 140) * ratio)  # 140 (orange-red) -> 200 (orange-yellow)
+        b = int(0)  # No blue
     elif ph_value < 7.0:
-        # Slightly acidic to neutral: Red-orange to yellow
-        # Scale from red (pH 5.5) to yellow (pH 7.0)
+        # Slightly acidic to neutral: Orange-yellow to yellow
+        # Scale from orange-yellow (pH 5.5) to yellow (pH 7.0)
         ratio = (ph_value - 5.5) / 1.5  # 0 to 1
         ratio = max(0.0, min(1.0, ratio))
         r = int(255 - (255 - 255) * ratio)    # 255 -> 255 (keep red high)
-        g = int(0 + (255 - 0) * ratio)        # 0 -> 255 (increase green)
+        g = int(200 + (255 - 200) * ratio)    # 200 -> 255 (increase green to yellow)
         b = int(0)                             # 0 (no blue)
     elif ph_value < 7.5:
         # Neutral to slightly alkaline: Yellow to light blue
