@@ -16,7 +16,7 @@ If you want to export new data from Google Earth Engine:
 
 ### Step 1: Set Up Configuration (REQUIRED)
 
-1. Copy `configs/config.example.yaml` to `configs/config.yaml`
+1. Copy `configs/config.template.yaml` to `configs/config.yaml`
 2. **Fill in your actual credentials** (replace placeholders):
    ```yaml
    gee:
@@ -62,7 +62,7 @@ After exports complete:
 
 To make these scripts functional, you need:
 
-1. **`configs/config.yaml`** - Copy from `configs/config.example.yaml` and fill in:
+1. **`configs/config.yaml`** - Copy from `configs/config.template.yaml` and fill in:
    - `gee.project_name` - Your GEE project ID (replace `YOUR_GEE_PROJECT_ID`)
    - `gee.export_folder` - Your Google Drive folder ID (replace `YOUR_GOOGLE_DRIVE_FOLDER_ID`)
 

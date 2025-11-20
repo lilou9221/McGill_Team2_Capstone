@@ -154,7 +154,7 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     1. Load .env file if available (using python-dotenv)
     2. Try config.yaml (local file with secrets)
     3. If not found, try environment variables
-    4. If still not found, try config.example.yaml (with warning)
+    4. If still not found, try config.template.yaml (with warning)
     
     Environment variables can override config values:
     - Use prefix RC_ (e.g., RC_GEE__PROJECT_NAME for gee.project_name)
@@ -209,9 +209,9 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
             config = env_config
             config_source = "environment variables"
     
-    # Fallback 3: Try config.example.yaml (silently, just for structure)
+    # Fallback 3: Try config.template.yaml (silently, just for structure)
     if config is None:
-        example_path = config_path.parent / "config.example.yaml"
+        example_path = config_path.parent / "config.template.yaml"
         if example_path.exists():
             with open(example_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)

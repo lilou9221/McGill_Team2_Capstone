@@ -37,64 +37,59 @@ venv.bak/
 *~
 .DS_Store
 
-# Project specific
-# Note: GeoTIFF files (*.tif, *.tiff) are tracked with Git LFS, not ignored
+# Project Outputs
+output/html/*.html
+output/maps/*
+logs/*.log
+run.log
+.progress.json
+
+# Processed Data Cache
 data/processed/cache/
 !data/processed/cache/.gitkeep
 data/processed/cache/**/*.parquet
 data/processed/cache/**/*.csv
 data/processed/cache/**/*.json
-output/html/*.html
-output/maps/*
-logs/*.log
-.progress.json
 
-# Keep directory structure
+# Directory Structure Keepers
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !output/html/.gitkeep
 !output/maps/.gitkeep
 !logs/.gitkeep
 
-# Config files with secrets and private information
+# Configuration Files with Secrets
+configs/config.yaml
 configs/credentials.json
 configs/client_secrets.json
 configs/settings.yaml
-configs/config.yaml
 settings.yaml
 *.env
 .env
 .env.*
 
-# Temporary files
+# Temporary Files
 *.tmp
 *.temp
 temp_*/
 tmp_*/
 
-# Test files (except Step 14 tests in tests/ directory)
+# Test Files (except tests/ directory)
 test_*.py
 *_test.csv
 *_test.json
 !tests/**/*.py
 
-# HTML files (except output maps)
-*.html
-!output/html/*.html
-
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# pytest
+# Testing and Type Checking
 .pytest_cache/
 .coverage
 htmlcov/
-
-# mypy
 .mypy_cache/
 .dmypy.json
 dmypy.json
 
-# Personal files
+# Personal Files
 TODO.md
-STREAMLIT_CLOUD_SETUP.local.md

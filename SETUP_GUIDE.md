@@ -73,7 +73,7 @@ Configuration is optional - the tool works with sensible defaults. If you want t
 
 1. Copy the example configuration:
    ```bash
-   cp configs/config.example.yaml configs/config.yaml
+   cp configs/config.template.yaml configs/config.yaml
    ```
 
 2. Edit `configs/config.yaml` to customize:
