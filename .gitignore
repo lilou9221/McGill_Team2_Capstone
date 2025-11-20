@@ -38,10 +38,7 @@ venv.bak/
 .DS_Store
 
 # Project specific
-data/raw/*.tif
-data/raw/*.tiff
-data/processed/*.csv
-data/processed/*.json
+# Note: GeoTIFF files (*.tif, *.tiff) are tracked with Git LFS, not ignored
 data/processed/cache/
 !data/processed/cache/.gitkeep
 data/processed/cache/**/*.parquet
@@ -59,11 +56,14 @@ logs/*.log
 !output/maps/.gitkeep
 !logs/.gitkeep
 
-# Config files with secrets
+# Config files with secrets and private information
 configs/credentials.json
 configs/client_secrets.json
 configs/settings.yaml
+configs/config.yaml
 settings.yaml
+*.env
+.env.*
 
 # Temporary files
 *.tmp
