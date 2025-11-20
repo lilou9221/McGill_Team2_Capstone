@@ -113,21 +113,34 @@ with st.sidebar:
 # ============================================================
 # MAIN PIPELINE
 # ============================================================
+# Use session state to track if analysis is running
+if "analysis_running" not in st.session_state:
+    st.session_state.analysis_running = False
+if "current_process" not in st.session_state:
+    st.session_state.current_process = None
+
 if run_btn:
+    # Prevent multiple simultaneous runs
+    if st.session_state.analysis_running:
+        st.warning("Analysis is already running. Please wait for it to complete.")
+        st.stop()
+    
+    # Set running flag
+    st.session_state.analysis_running = True
+    
     # (your entire pipeline code stays 100% unchanged until here)
     with st.spinner("Preparing data…"):
-        tmp_raw = Path(tempfile.mkdtemp(prefix="rc_raw_"))
         raw_dir = PROJECT_ROOT / config["data"]["raw"]
         raw_dir.mkdir(parents=True, exist_ok=True)
         # Check for local GeoTIFF files
         tif_files = list(raw_dir.glob("*.tif"))
-        if len(tif_files) >= 5:
-            st.info("Using local GeoTIFF files from data/raw/ directory.")
-            shutil.copytree(raw_dir, tmp_raw, dirs_exist_ok=True)
-        else:
+        if len(tif_files) < 5:
             st.error("No GeoTIFF files found in data/raw/ directory.")
             st.info("Please ensure GeoTIFF data files are manually placed in the data/raw/ directory.")
+            st.session_state.analysis_running = False
             st.stop()
+        else:
+            st.info("Using local GeoTIFF files from data/raw/ directory.")
 
     wrapper_script = PROJECT_ROOT / "scripts" / "run_analysis.py"
     
@@ -171,6 +184,8 @@ if run_btn:
             cwd=str(PROJECT_ROOT),  # Set working directory to project root
             env=env  # Pass environment with PYTHONPATH
         )
+        # Store process in session state for potential cleanup
+        st.session_state.current_process = process
         start = time.time()
         
         # Read output line by line with timeout handling
@@ -188,9 +203,14 @@ if run_btn:
                     log_box.code("".join(logs[-20:]), language="bash")
         except Exception as read_error:
             logs.append(f"\n[Error reading subprocess output: {read_error}]\n")
+        finally:
+            # Ensure process is properly closed
+            if process.stdout:
+                process.stdout.close()
         
-        process.stdout.close()
         return_code = process.wait()
+        # Clear process from session state
+        st.session_state.current_process = None
         
         if return_code != 0:
             st.error("Pipeline failed.")
@@ -199,11 +219,46 @@ if run_btn:
                 error_msg = "No output captured. Check that all dependencies are installed and data files are present."
             st.code(error_msg, language="bash")
             st.expander("Full Error Details", expanded=False).code(error_msg, language="bash")
+            st.session_state.analysis_running = False
             st.stop()
+        
+        # Check results file after subprocess completes successfully
+        csv_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
+        if not csv_path.exists():
+            st.error("Results missing.")
+            st.info(f"Expected file: {csv_path}")
+            st.info("The analysis pipeline may have failed. Check the error messages above.")
+            st.session_state.analysis_running = False
+            st.stop()
+
+        try:
+            df = pd.read_csv(csv_path)
+            if df.empty:
+                st.error("Results file is empty.")
+                st.session_state.analysis_running = False
+                st.stop()
+            # Verify required column exists
+            if "suitability_score" not in df.columns:
+                st.error("Results file missing 'suitability_score' column.")
+                st.info(f"Available columns: {', '.join(df.columns)}")
+                st.session_state.analysis_running = False
+                st.stop()
+        except Exception as e:
+            st.error(f"Failed to read results file: {e}")
+            st.info(f"File path: {csv_path}")
+            st.session_state.analysis_running = False
+            st.stop()
+        
+        # Reset running flag on successful completion
+        st.session_state.analysis_running = False
+        st.success("Analysis completed successfully!")
+        
     except FileNotFoundError as e:
         st.error(f"Failed to find required file or script: {e}")
         st.info(f"Looking for: {wrapper_script}")
         st.info(f"Python executable: {sys.executable}")
+        st.session_state.analysis_running = False
+        st.session_state.current_process = None
         st.stop()
     except Exception as e:
         st.error(f"Failed to start pipeline: {e}")
@@ -211,31 +266,14 @@ if run_btn:
         error_details = traceback.format_exc()
         st.code(error_details, language="python")
         st.expander("Full Error Traceback", expanded=False).code(error_details, language="python")
+        st.session_state.analysis_running = False
+        st.session_state.current_process = None
         st.stop()
-
-    csv_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
-    if not csv_path.exists():
-        st.error("Results missing.")
-        st.info(f"Expected file: {csv_path}")
-        st.info("The analysis pipeline may have failed. Check the error messages above.")
-        st.stop()
-
-    try:
-        df = pd.read_csv(csv_path)
-        if df.empty:
-            st.error("Results file is empty.")
-            st.stop()
-        # Verify required column exists
-        if "suitability_score" not in df.columns:
-            st.error("Results file missing 'suitability_score' column.")
-            st.info(f"Available columns: {', '.join(df.columns)}")
-            st.stop()
-    except Exception as e:
-        st.error(f"Failed to read results file: {e}")
-        st.info(f"File path: {csv_path}")
-        st.stop()
-    
-    st.success("Analysis completed successfully!")
+    finally:
+        # Always reset running flag when done (success or failure)
+        # This ensures the flag is reset even if an exception occurs
+        if "analysis_running" in st.session_state:
+            st.session_state.analysis_running = False
 
     # ============================================================
     # METRICS
