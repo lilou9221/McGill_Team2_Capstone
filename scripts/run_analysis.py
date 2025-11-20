@@ -40,4 +40,7 @@ if __name__ == "__main__":
     # Call main() - it will parse sys.argv and handle everything
     exit_code = main()
     sys.exit(exit_code)
+    
+from src.analysis.biochar_recommender import recommend_biochar
 
+hex_df = recommend_biochar(hex_df)   # ← this adds all 8 new columns instantly
