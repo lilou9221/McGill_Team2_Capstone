@@ -20,13 +20,45 @@ PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.visualization.pydeck_maps.municipality_waste_map import build_investor_waste_deck
+from src.utils.config_loader import load_config
 
 @st.cache_data
-def load_config():
-    with open(PROJECT_ROOT / "configs" / "config.yaml", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+def get_config():
+    """
+    Load configuration with fallback system:
+    1. config.yaml (local file)
+    2. Environment variables (RC_ prefix)
+    3. Streamlit Secrets (st.secrets)
+    4. config.example.yaml (template)
+    """
+    try:
+        config = load_config()
+        
+        # Merge Streamlit Secrets if available (highest priority)
+        if "gee" in st.secrets:
+            if "gee" not in config:
+                config["gee"] = {}
+            if "project_name" in st.secrets["gee"]:
+                config["gee"]["project_name"] = st.secrets["gee"]["project_name"]
+            if "export_folder" in st.secrets["gee"]:
+                config["gee"]["export_folder"] = st.secrets["gee"]["export_folder"]
+        
+        if "drive" in st.secrets:
+            if "drive" not in config:
+                config["drive"] = {}
+            if "raw_data_folder_id" in st.secrets["drive"]:
+                config["drive"]["raw_data_folder_id"] = st.secrets["drive"]["raw_data_folder_id"]
+        
+        return config
+    except FileNotFoundError as e:
+        st.error(f"Configuration error: {e}")
+        st.info("💡 **Tip:** Set up your configuration using Streamlit Secrets. See `STREAMLIT_CLOUD_SETUP.md` for instructions.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Unexpected error loading configuration: {e}")
+        st.stop()
 
-config = load_config()
+config = get_config()
 
 st.set_page_config(
     page_title="Biochar Suitability Mapper",
