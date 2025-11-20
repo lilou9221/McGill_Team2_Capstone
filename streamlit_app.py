@@ -130,30 +130,106 @@ if run_btn:
             st.stop()
 
     wrapper_script = PROJECT_ROOT / "scripts" / "run_analysis.py"
-    cli = [sys.executable, str(wrapper_script), "--config", str(PROJECT_ROOT / "configs" / "config.yaml"), "--h3-resolution", str(h3_res)]
+    
+    # Verify script exists
+    if not wrapper_script.exists():
+        st.error(f"Analysis script not found: {wrapper_script}")
+        st.info("Please ensure scripts/run_analysis.py exists in the project root.")
+        st.stop()
+    
+    # Build command line - config is optional (will use defaults if not found)
+    config_file = PROJECT_ROOT / "configs" / "config.yaml"
+    cli = [sys.executable, str(wrapper_script), "--h3-resolution", str(h3_res)]
+    
+    # Only add config if it exists, otherwise use defaults (config_loader will handle it)
+    if config_file.exists():
+        cli += ["--config", str(config_file)]
+    # If config.yaml doesn't exist, don't pass --config, let it use defaults
+    
     if use_coords and lat and lon and radius:
         cli += ["--lat", str(lat), "--lon", str(lon), "--radius", str(radius)]
 
     status = st.empty()
     log_box = st.empty()
     logs = []
-    process = subprocess.Popen(cli, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
-    start = time.time()
-    for line in process.stdout:
-        logs.append(line)
-        status.info(f"Running… {int(time.time()-start)}s elapsed")
-        log_box.code("".join(logs[-12:]), language="bash")
-    if process.wait() != 0:
-        st.error("Pipeline failed.")
-        st.code("".join(logs), language="bash")
+    
+    # Ensure working directory is project root for subprocess
+    try:
+        # Ensure Python path includes project root for imports
+        env = os.environ.copy()
+        python_path = env.get("PYTHONPATH", "")
+        if str(PROJECT_ROOT) not in python_path:
+            env["PYTHONPATH"] = f"{PROJECT_ROOT}{os.pathsep}{python_path}" if python_path else str(PROJECT_ROOT)
+        
+        process = subprocess.Popen(
+            cli, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout for simpler handling
+            text=True, 
+            bufsize=1, 
+            universal_newlines=True,
+            cwd=str(PROJECT_ROOT),  # Set working directory to project root
+            env=env  # Pass environment with PYTHONPATH
+        )
+        start = time.time()
+        
+        # Read output line by line with timeout handling
+        try:
+            for line in process.stdout:
+                if line:
+                    logs.append(line)
+                    status.info(f"Running… {int(time.time()-start)}s elapsed")
+                    # Show last 20 lines for better debugging
+                    log_box.code("".join(logs[-20:]), language="bash")
+        except Exception as read_error:
+            logs.append(f"\n[Error reading subprocess output: {read_error}]\n")
+        
+        process.stdout.close()
+        return_code = process.wait()
+        
+        if return_code != 0:
+            st.error("Pipeline failed.")
+            error_msg = "".join(logs)
+            if not error_msg.strip():
+                error_msg = "No output captured. Check that all dependencies are installed and data files are present."
+            st.code(error_msg, language="bash")
+            st.expander("Full Error Details", expanded=False).code(error_msg, language="bash")
+            st.stop()
+    except FileNotFoundError as e:
+        st.error(f"Failed to find required file or script: {e}")
+        st.info(f"Looking for: {wrapper_script}")
+        st.info(f"Python executable: {sys.executable}")
+        st.stop()
+    except Exception as e:
+        st.error(f"Failed to start pipeline: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        st.code(error_details, language="python")
+        st.expander("Full Error Traceback", expanded=False).code(error_details, language="python")
         st.stop()
 
     csv_path = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
     if not csv_path.exists():
         st.error("Results missing.")
+        st.info(f"Expected file: {csv_path}")
+        st.info("The analysis pipeline may have failed. Check the error messages above.")
         st.stop()
 
-    df = pd.read_csv(csv_path)
+    try:
+        df = pd.read_csv(csv_path)
+        if df.empty:
+            st.error("Results file is empty.")
+            st.stop()
+        # Verify required column exists
+        if "suitability_score" not in df.columns:
+            st.error("Results file missing 'suitability_score' column.")
+            st.info(f"Available columns: {', '.join(df.columns)}")
+            st.stop()
+    except Exception as e:
+        st.error(f"Failed to read results file: {e}")
+        st.info(f"File path: {csv_path}")
+        st.stop()
+    
     st.success("Analysis completed successfully!")
 
     # ============================================================
@@ -168,17 +244,22 @@ if run_btn:
         </div>
         ''', unsafe_allow_html=True)
     with col2:
+        mean_score = df["suitability_score"].mean() if "suitability_score" in df.columns else 0.0
         st.markdown(f'''
         <div class="metric-card">
             <h4>Mean Suitability Score<br>
                 <small style="color:#173a30; font-weight:500;">(scale: 0–10)</small>
             </h4>
-            <p>{df["suitability_score"].mean():.2f}</p>
+            <p>{mean_score:.2f}</p>
         </div>
         ''', unsafe_allow_html=True)
     with col3:
-        mod_high = (df["suitability_score"] >= 7.0).sum()
-        pct = mod_high / len(df) * 100
+        if "suitability_score" in df.columns:
+            mod_high = (df["suitability_score"] >= 7.0).sum()
+            pct = mod_high / len(df) * 100 if len(df) > 0 else 0.0
+        else:
+            mod_high = 0
+            pct = 0.0
         st.markdown(f'''
         <div class="metric-card">
             <h4>Moderately to Highly Suitable<br>
@@ -192,7 +273,11 @@ if run_btn:
     # SAFE TABLE + RECOMMENDATIONS (NO MORE KeyError!)
     # ============================================================
     st.subheader("Suitability Scores")
-    st.dataframe(df.sort_values("suitability_score", ascending=False), width='stretch', hide_index=True)
+    if "suitability_score" in df.columns:
+        st.dataframe(df.sort_values("suitability_score", ascending=False), width='stretch', hide_index=True)
+    else:
+        st.dataframe(df, width='stretch', hide_index=True)
+        st.warning("'suitability_score' column not found. Displaying all available data.")
 
     # Auto-detect recommendation columns
     feed_col = None
@@ -205,26 +290,43 @@ if run_btn:
 
     st.subheader("Top 10 Recommended Locations")
     if feed_col and reason_col and "h3_index" in df.columns:
-        display_cols = ["h3_index", "suitability_score", feed_col, reason_col]
+        display_cols = ["h3_index"]
+        if "suitability_score" in df.columns:
+            display_cols.append("suitability_score")
         if "mean_soc" in df.columns:
-            display_cols.insert(2, "mean_soc")
+            display_cols.append("mean_soc")
         if "mean_ph" in df.columns:
-            display_cols.insert(3, "mean_ph")
+            display_cols.append("mean_ph")
         if "mean_moisture" in df.columns:
-            display_cols.insert(4, "mean_moisture")
-
-        st.dataframe(
-            df[display_cols]
-            .sort_values("suitability_score", ascending=False)
-            .head(10)
-            .round(3)
-            .style.format({
-                "suitability_score": "{:.2f}",
-                "mean_soc": "{:.1f}",
-                "mean_ph": "{:.2f}",
-                "mean_moisture": "{:.1%}"
-            })
-        )
+            display_cols.append("mean_moisture")
+        display_cols.extend([feed_col, reason_col])
+        
+        # Filter to only columns that exist
+        display_cols = [col for col in display_cols if col in df.columns]
+        
+        if display_cols:
+            top_df = df[display_cols]
+            # Sort by suitability_score if available, otherwise by first column
+            sort_col = "suitability_score" if "suitability_score" in display_cols else display_cols[0]
+            top_df = top_df.sort_values(sort_col, ascending=False).head(10)
+            
+            # Format numeric columns
+            format_dict = {}
+            if "suitability_score" in display_cols:
+                format_dict["suitability_score"] = "{:.2f}"
+            if "mean_soc" in display_cols:
+                format_dict["mean_soc"] = "{:.1f}"
+            if "mean_ph" in display_cols:
+                format_dict["mean_ph"] = "{:.2f}"
+            if "mean_moisture" in display_cols:
+                format_dict["mean_moisture"] = "{:.1%}"
+            
+            if format_dict:
+                st.dataframe(top_df.round(3).style.format(format_dict))
+            else:
+                st.dataframe(top_df)
+        else:
+            st.warning("No displayable columns found.")
     else:
         st.info("No feedstock recommendations yet — run the analysis with the recommender enabled!")
 
@@ -249,40 +351,61 @@ if run_btn:
         st.subheader("Interactive Suitability Map")
         map_path = PROJECT_ROOT / config["output"]["html"] / "suitability_map.html"
         if map_path.exists():
-            with open(map_path, "r", encoding="utf-8") as f:
-                st.components.v1.html(f.read(), height=750, scrolling=False)
+            try:
+                with open(map_path, "r", encoding="utf-8") as f:
+                    map_html = f.read()
+                st.components.v1.html(map_html, height=750, scrolling=False)
+            except Exception as e:
+                st.error(f"Failed to load map: {e}")
+                st.info(f"Map file: {map_path}")
         else:
             st.warning("Interactive map not generated.")
+            st.info(f"Expected file: {map_path}")
 
     with tab2:
         st.subheader("Soil Organic Carbon Map")
         st.markdown("<p style='color: #333; margin-bottom: 1rem;'>SOC = average of surface and 10cm depth (g/kg).</p>", unsafe_allow_html=True)
         soc_map_path = PROJECT_ROOT / config["output"]["html"] / "soc_map_streamlit.html"
         if soc_map_path.exists():
-            with open(soc_map_path, "r", encoding="utf-8") as f:
-                st.components.v1.html(f.read(), height=750, scrolling=False)
+            try:
+                with open(soc_map_path, "r", encoding="utf-8") as f:
+                    map_html = f.read()
+                st.components.v1.html(map_html, height=750, scrolling=False)
+            except Exception as e:
+                st.error(f"Failed to load SOC map: {e}")
         else:
             st.warning("SOC map not generated.")
+            st.info(f"Expected file: {soc_map_path}")
 
     with tab3:
         st.subheader("Soil pH Map")
         st.markdown("<p style='color: #333; margin-bottom: 1rem;'>pH = average of surface and 10cm depth.</p>", unsafe_allow_html=True)
         ph_map_path = PROJECT_ROOT / config["output"]["html"] / "ph_map_streamlit.html"
         if ph_map_path.exists():
-            with open(ph_map_path, "r", encoding="utf-8") as f:
-                st.components.v1.html(f.read(), height=750, scrolling=False)
+            try:
+                with open(ph_map_path, "r", encoding="utf-8") as f:
+                    map_html = f.read()
+                st.components.v1.html(map_html, height=750, scrolling=False)
+            except Exception as e:
+                st.error(f"Failed to load pH map: {e}")
         else:
             st.warning("pH map not generated.")
+            st.info(f"Expected file: {ph_map_path}")
 
     with tab4:
         st.subheader("Soil Moisture Map")
         st.markdown("<p style='color: #333; margin-bottom: 1rem;'>Moisture shown as percentage (0–100%).</p>", unsafe_allow_html=True)
         moisture_map_path = PROJECT_ROOT / config["output"]["html"] / "moisture_map_streamlit.html"
         if moisture_map_path.exists():
-            with open(moisture_map_path, "r", encoding="utf-8") as f:
-                st.components.v1.html(f.read(), height=750, scrolling=False)
+            try:
+                with open(moisture_map_path, "r", encoding="utf-8") as f:
+                    map_html = f.read()
+                st.components.v1.html(map_html, height=750, scrolling=False)
+            except Exception as e:
+                st.error(f"Failed to load moisture map: {e}")
         else:
             st.warning("Soil moisture map not generated.")
+            st.info(f"Expected file: {moisture_map_path}")
 
     with investor_tab:
         st.subheader("Investor Crop Area Map")
@@ -295,14 +418,23 @@ if run_btn:
             st.warning("Municipality crop CSV missing. Expected data/crop_data/Brazil_Municipality_Crop_Area_2024.csv")
         else:
             try:
-                deck, waste_gdf = build_investor_waste_deck(
+                deck, merged_gdf = build_investor_waste_deck(
                     boundaries_dir, waste_csv_path, simplify_tolerance=0.01
                 )
                 st.pydeck_chart(deck, use_container_width=True)
 
-                total_area = waste_gdf["display_value"].sum()
+                # Check if display_value column exists
+                if "display_value" not in merged_gdf.columns:
+                    st.warning("display_value column not found in merged data. Using total_crop_area_ha instead.")
+                    if "total_crop_area_ha" in merged_gdf.columns:
+                        merged_gdf["display_value"] = merged_gdf["total_crop_area_ha"]
+                    else:
+                        st.error("No crop area data found in merged GeoDataFrame.")
+                        st.stop()
+
+                total_area = merged_gdf["display_value"].sum()
                 top_municipalities = (
-                    waste_gdf.sort_values("display_value", ascending=False)
+                    merged_gdf.sort_values("display_value", ascending=False)
                     .head(5)[["NM_MUN", "SIGLA_UF", "display_value"]]
                 )
 
