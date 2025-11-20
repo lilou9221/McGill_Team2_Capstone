@@ -195,13 +195,13 @@ class GEEDataLoader:
         Load configuration from YAML file.
         
         TEMPLATE: This will fail if config.yaml doesn't exist or doesn't have GEE credentials.
-        User must create config.yaml from config.example.yaml and fill in their credentials.
+        User must create config.yaml from config.template.yaml and fill in their credentials.
         """
         if not self.config_path.exists():
             raise FileNotFoundError(
                 f"Configuration file not found: {self.config_path}\n"
                 f"To use GEE export features:\n"
-                f"  1. Copy configs/config.example.yaml to configs/config.yaml\n"
+                f"  1. Copy configs/config.template.yaml to configs/config.yaml\n"
                 f"  2. Fill in your GEE project_name and export_folder values\n"
                 f"  3. See src/data/acquisition/README_TEMPLATE.md for instructions"
             )

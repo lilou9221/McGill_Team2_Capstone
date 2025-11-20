@@ -103,9 +103,9 @@ The `config.yaml` file is **only needed** if you want to use the optional GEE ex
 
 **If you need to export data from GEE:**
 
-1. Copy the example configuration:
+1. Copy the template configuration:
    ```bash
-   cp configs/config.example.yaml configs/config.yaml
+   cp configs/config.template.yaml configs/config.yaml
    ```
 
 2. Edit `configs/config.yaml` and fill in your GEE/Drive values:
