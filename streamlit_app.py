@@ -188,6 +188,13 @@ if run_btn:
     st.subheader("Suitability Scores")
     st.dataframe(df.sort_values("suitability_score", ascending=False), width='stretch', hide_index=True)
 
+    st.subheader("Top 10 Recommended Locations")
+    st.dataframe(
+    df[["h3_index", "suitability_score", "Recommended_Feedstock", "Recommendation_Reason"]]
+    .sort_values("suitability_score", ascending=False)
+    .head(10)
+    )
+
     st.download_button(
         label="Download Results as CSV",
         data=df.to_csv(index=False).encode(),
