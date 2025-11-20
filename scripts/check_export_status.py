@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import ee
-from src.data.acquisition.gee_loader import GEEDataLoader
+from src.data_acquisition.gee_loader import GEEDataLoader
 
 
 def check_task_status(task_ids=None):

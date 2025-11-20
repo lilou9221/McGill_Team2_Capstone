@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Optional, Tuple
 
-from src.analysis.soil_quality_biochar import calculate_soil_quality_for_biochar
+from src.analyzers.soil_quality_biochar import calculate_soil_quality_for_biochar
 
 
 def convert_moisture_to_percent(moisture_m3_m3: float) -> float:

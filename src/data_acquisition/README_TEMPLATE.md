@@ -35,7 +35,7 @@ python -c "import ee; ee.Authenticate()"
 ### Step 3: Run Export Script
 
 ```bash
-python src/data_loader.py
+python src/data_acquisition/data_loader.py
 ```
 
 This will:
@@ -55,7 +55,7 @@ After exports complete:
 
 - `gee_loader.py` - Google Earth Engine data loader template (requires `earthengine-api` and credentials)
 - `smap_downscaling.py` - SMAP dataset downscaling utilities
-- `data_loader.py` (in parent `src/` directory) - Main export script template
+- `data_loader.py` - Main export script template
 - `README_TEMPLATE.md` - This file (usage instructions)
 
 ## Required Configuration Files

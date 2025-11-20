@@ -17,7 +17,7 @@ import pydeck as pdk
 PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.visualization.pydeck_maps.municipality_waste_map import build_investor_waste_deck
+from src.map_generators.pydeck_maps.municipality_waste_map import build_investor_waste_deck
 from src.utils.config_loader import load_config
 
 @st.cache_data

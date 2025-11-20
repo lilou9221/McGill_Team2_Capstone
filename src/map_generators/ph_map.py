@@ -11,8 +11,8 @@ import pandas as pd
 import numpy as np
 import pydeck as pdk
 
-from src.data.processing.raster_to_csv import raster_to_dataframe
-from src.data.processing.h3_converter import add_h3_to_dataframe
+from src.data_processors.raster_to_csv import raster_to_dataframe
+from src.data_processors.h3_converter import add_h3_to_dataframe
 
 
 def get_ph_color_rgb(ph_value: float, min_ph: float, max_ph: float) -> tuple:

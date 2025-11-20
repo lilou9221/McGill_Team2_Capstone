@@ -21,7 +21,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.data.acquisition.gee_loader import GEEDataLoader
+from src.data_acquisition.gee_loader import GEEDataLoader
 from src.utils.initialization import initialize_project
 
 

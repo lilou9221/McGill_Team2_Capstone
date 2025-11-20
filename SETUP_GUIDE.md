@@ -278,7 +278,7 @@ Once setup is complete, you can:
    ```bash
    python - <<'PY'
    from pathlib import Path
-   from src.data.processing.raster_clip import verify_clipping_success
+   from src.data_processors.raster_clip import verify_clipping_success
    from src.utils.geospatial import create_circle_buffer
 
    circle = create_circle_buffer(-15.5, -56.0, 100)

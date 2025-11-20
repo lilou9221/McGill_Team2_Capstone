@@ -1,4 +1,4 @@
-# src/analysis/biochar_recommender.py
+# src/analyzers/biochar_recommender.py
 from pathlib import Path
 import pandas as pd
 

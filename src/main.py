@@ -15,25 +15,25 @@ import shutil
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils.initialization import initialize_project
-from src.data.processing.user_input import get_user_area_of_interest
-from src.data.processing.raster_clip import clip_all_rasters_to_circle
+from src.data_processors.user_input import get_user_area_of_interest
+from src.data_processors.raster_clip import clip_all_rasters_to_circle
 from src.utils.geospatial import create_circle_buffer
-from src.data.processing.raster_to_csv import convert_all_rasters_to_dataframes
-from src.data.processing.h3_converter import process_dataframes_with_h3
-from src.analysis.suitability import merge_and_aggregate_soil_data
-from src.visualization.biochar_map import create_biochar_suitability_map
-from src.visualization.soc_map import create_soc_map
-from src.visualization.ph_map import create_ph_map
-from src.visualization.moisture_map import create_moisture_map
-from src.analysis.biochar_suitability import calculate_biochar_suitability_scores
+from src.data_processors.raster_to_csv import convert_all_rasters_to_dataframes
+from src.data_processors.h3_converter import process_dataframes_with_h3
+from src.analyzers.suitability import merge_and_aggregate_soil_data
+from src.map_generators.biochar_map import create_biochar_suitability_map
+from src.map_generators.soc_map import create_soc_map
+from src.map_generators.ph_map import create_ph_map
+from src.map_generators.moisture_map import create_moisture_map
+from src.analyzers.biochar_suitability import calculate_biochar_suitability_scores
 from src.utils.browser import open_html_in_browser
-from src.visualization.pydeck_maps.municipality_waste_map import (
+from src.map_generators.pydeck_maps.municipality_waste_map import (
     build_investor_waste_deck,
 )
 import shutil
 
 # Biochar recommender available for future integration
-# from src.analysis.biochar_recommender import recommend_biochar
+# from src.analyzers.biochar_recommender import recommend_biochar
 
 def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
     """
@@ -150,7 +150,7 @@ def main():
 
     # Biochar recommender integration (future feature)
     # Uncomment and configure when ready to use:
-    # from src.analysis.biochar_recommender import recommend_biochar
+    # from src.analyzers.biochar_recommender import recommend_biochar
     # scored_df = recommend_biochar(scored_df)
 
     # Save final CSV for Streamlit

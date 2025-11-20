@@ -115,7 +115,7 @@ The `config.yaml` file is **only needed** if you want to use the optional GEE ex
      export_folder: "your-google-drive-folder-id"
    ```
 
-3. See `src/data/acquisition/README_TEMPLATE.md` for detailed instructions.
+3. See `src/data_acquisition/README_TEMPLATE.md` for detailed instructions.
 
 **Note:** The core pipeline processes local GeoTIFF files and doesn't require any configuration.
 
@@ -123,7 +123,7 @@ The `config.yaml` file is **only needed** if you want to use the optional GEE ex
 
 **No configuration is required for core functionality** - the tool works with sensible defaults.
 
-The `config.yaml` file is **only needed** if you want to use the optional GEE export scripts (see `src/data/acquisition/README_TEMPLATE.md`). For normal usage with manually placed data files, no configuration is needed.
+The `config.yaml` file is **only needed** if you want to use the optional GEE export scripts (see `src/data_acquisition/README_TEMPLATE.md`). For normal usage with manually placed data files, no configuration is needed.
 
 **Default Settings (work out of the box):**
 - Data directories: `data/raw`, `data/processed`
@@ -154,7 +154,7 @@ The tool processes GeoTIFF files that you manually place in the `data/raw/` dire
 
 **File naming:** The tool recognizes files by keywords in their names (e.g., "moisture", "SOC", "ph", "temp"). Files should be GeoTIFF format (.tif or .tiff extension).
 
-**Note:** If you need to export data from Google Earth Engine, you can use the optional scripts in `src/data/acquisition/`. However, this is not required - you can use data from any source as long as it's in GeoTIFF format.
+**Note:** If you need to export data from Google Earth Engine, you can use the optional scripts in `src/data_acquisition/`. However, this is not required - you can use data from any source as long as it's in GeoTIFF format.
 
 ### 2. Process and Map
 
