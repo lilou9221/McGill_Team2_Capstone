@@ -28,14 +28,14 @@ except ImportError:
 
 # Import downscaling module (bicubic resampling only)
 try:
-    from src.data.acquisition.smap_downscaling import downscale_smap_datasets
+    from src.data_acquisition.smap_downscaling import downscale_smap_datasets
 except ImportError:
     # Fallback when running as script
     import sys
     SCRIPT_ROOT = Path(__file__).resolve().parents[3]
     if str(SCRIPT_ROOT) not in sys.path:
         sys.path.insert(0, str(SCRIPT_ROOT))
-    from src.data.acquisition.smap_downscaling import downscale_smap_datasets
+    from src.data_acquisition.smap_downscaling import downscale_smap_datasets
 
 
 # Ensure project root is on sys.path when running as a script

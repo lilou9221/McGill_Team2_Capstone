@@ -66,7 +66,7 @@ pip install earthengine-api rasterio pandas h3 pydeck shapely pyyaml pyarrow
 **Problem**: `data/raw/` directory is empty or files are missing.
 
 **Solution**:
-1. Run the acquisition tool: `python src/data/acquisition/gee_loader.py`
+1. Run the acquisition tool: `python src/data_acquisition/gee_loader.py`
 2. When prompted, choose how many datasets to export (0 = all), review the task summary, and start the Drive tasks
 3. Wait for the exports to complete in Google Earth Engine
 4. **Automatic downloads**: Once Google Drive API is configured (see SETUP_GUIDE.md Step 4), files are automatically downloaded from Google Drive to `data/raw/` as export tasks complete. No manual step required.
@@ -251,7 +251,7 @@ pip install earthengine-api rasterio pandas h3 pydeck shapely pyyaml pyarrow
 **Problem**: pH map shows colors that are too dark red for acidic soils, making it hard to distinguish from neutral/alkaline areas.
 
 **Solution**:
-- This issue was fixed by updating the color scheme in `src/visualization/ph_map.py`
+- This issue was fixed by updating the color scheme in `src/map_generators/ph_map.py`
 - The pH map now uses lighter, more yellow-tinted colors for acidic soils:
   - Acidic soils (<5.5): Light orange-yellow (255, 140-200, 0) instead of dark red
   - Neutral (~7): Yellow (255, 255, 0)

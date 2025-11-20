@@ -1,8 +1,8 @@
 """
-Soil Organic Carbon (SOC) Map Generator
+Soil Moisture Map Generator
 
-Creates interactive maps showing SOC values aggregated by H3 hexagons.
-Uses b0 and b10 layers: mean_SOC = (mean(b0) + mean(b10)) / 2
+Creates interactive maps showing soil moisture values aggregated by H3 hexagons.
+Soil moisture is displayed as percentage (0-100%).
 """
 
 from pathlib import Path
@@ -11,54 +11,65 @@ import pandas as pd
 import numpy as np
 import pydeck as pdk
 
-from src.data.processing.raster_to_csv import raster_to_dataframe
-from src.data.processing.h3_converter import add_h3_to_dataframe
+from src.data_processors.raster_to_csv import raster_to_dataframe
+from src.data_processors.h3_converter import add_h3_to_dataframe
 
 
-def get_soc_color_rgb(soc_value: float, min_soc: float, max_soc: float) -> tuple:
+def get_moisture_color_rgb(moisture_value: float, min_moisture: float, max_moisture: float) -> tuple:
     """
-    Get RGB color for SOC value using a sequential color scheme (beige to dark green/brown).
+    Get RGB color for soil moisture value using a sequential color scheme (dry to wet).
+    
+    Color mapping:
+    - Light brown/yellow for dry soils (low moisture)
+    - Green for moderate moisture
+    - Blue for wet soils (high moisture)
     
     Parameters
     ----------
-    soc_value : float
-        SOC value in g/kg
-    min_soc : float
-        Minimum SOC value in dataset
-    max_soc : float
-        Maximum SOC value in dataset
+    moisture_value : float
+        Soil moisture percentage (0-100)
+    min_moisture : float
+        Minimum moisture value in dataset
+    max_moisture : float
+        Maximum moisture value in dataset
     
     Returns
     -------
     tuple
         RGB color tuple (r, g, b) with values 0-255
     """
-    if np.isnan(soc_value) or min_soc == max_soc:
+    if np.isnan(moisture_value) or min_moisture == max_moisture:
         return (128, 128, 128)  # Gray for NaN or constant values
     
     # Normalize to 0-1 range
-    normalized = (soc_value - min_soc) / (max_soc - min_soc)
+    normalized = (moisture_value - min_moisture) / (max_moisture - min_moisture)
     normalized = max(0.0, min(1.0, normalized))  # Clamp to [0, 1]
     
-    # Sequential color scheme: beige (#F5DEB3) to dark green (#2E7D32)
-    # Interpolate between beige and dark green through yellow-green
-    if normalized < 0.5:
-        # Beige to yellow-green
-        ratio = normalized * 2.0  # 0 to 1
-        r = int(245 - (245 - 173) * ratio)  # 245 -> 173
-        g = int(222 - (222 - 255) * ratio)  # 222 -> 255
-        b = int(179 - (179 - 47) * ratio)   # 179 -> 47
+    # Sequential color scheme: light brown (#D2B48C) to green (#228B22) to blue (#4169E1)
+    # Interpolate through: brown -> yellow-green -> green -> blue-green -> blue
+    if normalized < 0.33:
+        # Light brown to yellow-green
+        ratio = normalized / 0.33  # 0 to 1
+        r = int(210 - (210 - 173) * ratio)  # 210 -> 173
+        g = int(180 - (180 - 255) * ratio)  # 180 -> 255
+        b = int(140 - (140 - 47) * ratio)   # 140 -> 47
+    elif normalized < 0.67:
+        # Yellow-green to green
+        ratio = (normalized - 0.33) / 0.34  # 0 to 1
+        r = int(173 - (173 - 34) * ratio)   # 173 -> 34
+        g = int(255 - (255 - 139) * ratio)  # 255 -> 139
+        b = int(47 - (47 - 34) * ratio)     # 47 -> 34
     else:
-        # Yellow-green to dark green
-        ratio = (normalized - 0.5) * 2.0  # 0 to 1
-        r = int(173 - (173 - 46) * ratio)  # 173 -> 46
-        g = int(255 - (255 - 125) * ratio)  # 255 -> 125
-        b = int(47 - (47 - 50) * ratio)     # 47 -> 50
+        # Green to blue
+        ratio = (normalized - 0.67) / 0.33  # 0 to 1
+        r = int(34 - (34 - 65) * ratio)     # 34 -> 65
+        g = int(139 - (139 - 105) * ratio)  # 139 -> 105
+        b = int(34 - (34 - 225) * ratio)     # 34 -> 225
     
     return (r, g, b)
 
 
-def create_soc_map(
+def create_moisture_map(
     processed_dir: Path,
     output_path: Path,
     h3_resolution: int = 7,
@@ -69,10 +80,10 @@ def create_soc_map(
     config_path: Optional[Path] = None
 ) -> dict:
     """
-    Create interactive SOC map using H3 hexagons.
+    Create interactive soil moisture map using H3 hexagons.
     
     Uses processed data from merged_soil_data.csv (same as suitability map) which already
-    has H3 indexes and is clipped if coordinates were provided. Extracts SOC columns (b0 and b10)
+    has H3 indexes and is clipped if coordinates were provided. Extracts moisture column
     and aggregates by hexagon.
     
     Parameters
@@ -99,8 +110,8 @@ def create_soc_map(
     dict
         Map generation info with keys: 'method', 'file_size_mb', 'file_path'
     """
-    print("\nCreating SOC map...")
-    print(f"  Loading SOC data from processed data: {processed_dir}")
+    print("\nCreating soil moisture map...")
+    print(f"  Loading moisture data from processed data: {processed_dir}")
     
     # Load merged soil data (already has H3 indexes and is clipped if coordinates were provided)
     merged_csv = processed_dir / "merged_soil_data.csv"
@@ -111,43 +122,35 @@ def create_soc_map(
     merged_df = pd.read_csv(merged_csv)
     print(f"    Loaded {len(merged_df):,} rows from merged data")
     
-    # Find SOC columns (b0 and b10)
-    soc_cols = [col for col in merged_df.columns if 'soc' in col.lower() or 'soil_organic' in col.lower()]
-    if not soc_cols:
-        raise ValueError(f"No SOC columns found in merged data. Available columns: {list(merged_df.columns)}")
+    # Find moisture column
+    moisture_cols = [col for col in merged_df.columns if 'moisture' in col.lower() or 'sm_surface' in col.lower()]
+    if not moisture_cols:
+        raise ValueError(f"No moisture columns found in merged data. Available columns: {list(merged_df.columns)}")
     
-    # Find b0 and b10 columns
-    b0_cols = [col for col in soc_cols if 'b0' in col.lower() and 'b10' not in col.lower()]
-    b10_cols = [col for col in soc_cols if 'b10' in col.lower()]
-    
-    print(f"    Found SOC columns: {soc_cols}")
+    # Use first moisture column found
+    moisture_col = moisture_cols[0]
+    print(f"    Found moisture column: {moisture_col}")
     
     # Check if H3 index is already present
     if 'h3_index' not in merged_df.columns:
         raise ValueError("H3 index not found in merged data. Data may not have been processed correctly.")
     
-    # Calculate mean SOC from b0 and b10
-    if b0_cols and b10_cols:
-        # Use first b0 and first b10 column
-        b0_col = b0_cols[0]
-        b10_col = b10_cols[0]
-        print(f"  Calculating mean SOC from {b0_col} and {b10_col}")
-        merged_df['soc'] = merged_df[[b0_col, b10_col]].mean(axis=1, skipna=True)
-    elif b0_cols:
-        print(f"  Using b0 only: {b0_cols[0]}")
-        merged_df['soc'] = merged_df[b0_cols[0]]
-    elif b10_cols:
-        print(f"  Using b10 only: {b10_cols[0]}")
-        merged_df['soc'] = merged_df[b10_cols[0]]
+    # Extract moisture values and convert from m³/m³ to percentage (0-100)
+    # Check if values are already in percentage (range 0-100) or in m³/m³ (range 0-1)
+    sample_value = merged_df[moisture_col].dropna().iloc[0] if not merged_df[moisture_col].dropna().empty else None
+    if sample_value is not None and sample_value <= 1.0:
+        # Values are in m³/m³, convert to percentage
+        merged_df['moisture'] = merged_df[moisture_col] * 100.0
     else:
-        raise ValueError("No b0 or b10 SOC columns found in merged data")
+        # Values are already in percentage
+        merged_df['moisture'] = merged_df[moisture_col]
     
-    # Drop rows with NaN SOC values
-    merged_df = merged_df.dropna(subset=['soc', 'h3_index'])
-    print(f"    {len(merged_df):,} rows with valid SOC and H3 index")
+    # Drop rows with NaN moisture values
+    merged_df = merged_df.dropna(subset=['moisture', 'h3_index'])
+    print(f"    {len(merged_df):,} rows with valid moisture and H3 index")
     
     if merged_df.empty:
-        raise ValueError("No valid SOC data points found")
+        raise ValueError("No valid moisture data points found")
     
     # Check if data is already aggregated (one row per hexagon) or needs aggregation
     unique_hexagons = merged_df['h3_index'].nunique()
@@ -156,7 +159,7 @@ def create_soc_map(
     if unique_hexagons == total_rows:
         # Data is already aggregated - one row per hexagon
         print("  Data is already aggregated by hexagon")
-        hexagon_data = merged_df[['h3_index', 'soc', 'lat', 'lon']].copy()
+        hexagon_data = merged_df[['h3_index', 'moisture', 'lat', 'lon']].copy()
         # Add point_count if available, otherwise set to 1
         if 'point_count' in merged_df.columns:
             hexagon_data['point_count'] = merged_df['point_count']
@@ -165,9 +168,9 @@ def create_soc_map(
         print(f"    Using {len(hexagon_data):,} hexagons (already aggregated)")
     else:
         # Data needs aggregation - multiple points per hexagon
-        print("  Aggregating SOC by hexagon...")
+        print("  Aggregating moisture by hexagon...")
         hexagon_data = merged_df.groupby('h3_index').agg({
-            'soc': 'mean',
+            'moisture': 'mean',
             'lat': 'first',
             'lon': 'first'
         }).reset_index()
@@ -185,10 +188,10 @@ def create_soc_map(
         center_lon = hexagon_data['lon'].mean()
     
     # Prepare data for visualization
-    hexagon_data = _prepare_soc_hexagon_data(hexagon_data)
+    hexagon_data = _prepare_moisture_hexagon_data(hexagon_data)
     
     # Create PyDeck layer
-    layer = _create_soc_h3_hexagon_layer(hexagon_data)
+    layer = _create_moisture_h3_hexagon_layer(hexagon_data)
     
     # Create view state
     view_state = pdk.ViewState(
@@ -202,7 +205,7 @@ def create_soc_map(
     # Create tooltip
     tooltip = {
         'html': '''
-        <b>Soil Organic Carbon:</b> {soc_formatted} g/kg<br>
+        <b>Soil Moisture:</b> {moisture_formatted}%<br>
         <b>Location:</b> {lat_formatted}, {lon_formatted}<br>
         <b>Points:</b> {point_count}
         ''',
@@ -224,7 +227,7 @@ def create_soc_map(
     deck.to_html(str(output_path))
     
     file_size_mb = output_path.stat().st_size / (1024 * 1024)
-    print(f"  SOC map created: {file_size_mb:.2f} MB")
+    print(f"  Soil moisture map created: {file_size_mb:.2f} MB")
     
     return {
         'method': 'pydeck',
@@ -233,34 +236,34 @@ def create_soc_map(
     }
 
 
-def _prepare_soc_hexagon_data(hexagon_data: pd.DataFrame) -> pd.DataFrame:
-    """Prepare hexagon data for SOC map visualization."""
+def _prepare_moisture_hexagon_data(hexagon_data: pd.DataFrame) -> pd.DataFrame:
+    """Prepare hexagon data for moisture map visualization."""
     # Format values for tooltip
     hexagon_data['lat_formatted'] = hexagon_data['lat'].apply(lambda x: f"{x:.2f}")
     hexagon_data['lon_formatted'] = hexagon_data['lon'].apply(lambda x: f"{x:.2f}")
-    hexagon_data['soc_formatted'] = hexagon_data['soc'].apply(
+    hexagon_data['moisture_formatted'] = hexagon_data['moisture'].apply(
         lambda x: f"{x:.2f}" if pd.notna(x) else "N/A"
     )
     
-    # Calculate color based on SOC value
-    min_soc = hexagon_data['soc'].min()
-    max_soc = hexagon_data['soc'].max()
+    # Calculate color based on moisture value
+    min_moisture = hexagon_data['moisture'].min()
+    max_moisture = hexagon_data['moisture'].max()
     
-    def get_color_rgba(soc_value):
-        """Get RGBA color array for SOC value."""
-        r, g, b = get_soc_color_rgb(soc_value, min_soc, max_soc)
+    def get_color_rgba(moisture_value):
+        """Get RGBA color array for moisture value."""
+        r, g, b = get_moisture_color_rgb(moisture_value, min_moisture, max_moisture)
         return [r, g, b, 255]  # Full opacity
     
-    hexagon_data['color'] = hexagon_data['soc'].apply(get_color_rgba)
+    hexagon_data['color'] = hexagon_data['moisture'].apply(get_color_rgba)
     
     print(f"  Prepared {len(hexagon_data):,} H3 hexagons")
-    print(f"  SOC range: {min_soc:.2f} - {max_soc:.2f} g/kg")
+    print(f"  Moisture range: {min_moisture:.2f} - {max_moisture:.2f}%")
     
     return hexagon_data
 
 
-def _create_soc_h3_hexagon_layer(hexagon_data: pd.DataFrame) -> pdk.Layer:
-    """Create H3 hexagon layer for SOC map."""
+def _create_moisture_h3_hexagon_layer(hexagon_data: pd.DataFrame) -> pdk.Layer:
+    """Create H3 hexagon layer for moisture map."""
     return pdk.Layer(
         'H3HexagonLayer',
         data=hexagon_data,

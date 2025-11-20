@@ -16,7 +16,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.acquisition.gee_loader import GEEDataLoader
+from src.data_acquisition.gee_loader import GEEDataLoader
 
 
 def retry_exports(selected_layers=None):

@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import pydeck as pdk
 
-from src.visualization.color_scheme import get_biochar_suitability_color_rgb
+from src.map_generators.color_scheme import get_biochar_suitability_color_rgb
 
 
 def create_biochar_suitability_map(

@@ -10,7 +10,7 @@ if you need to obtain new data. It is NOT required for the core pipeline to func
 See README_TEMPLATE.md in this directory for usage instructions.
 """
 
-from src.data.acquisition.gee_loader import GEEDataLoader
+from src.data_acquisition.gee_loader import GEEDataLoader
 
 __all__ = ['GEEDataLoader']
 
