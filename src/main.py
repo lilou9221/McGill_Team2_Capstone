@@ -155,7 +155,7 @@ def main() -> int:
         for tif_file in filtered_tif_files:
             shutil.copy2(tif_file, tif_dir / tif_file.name)
         print("Using full Mato Grosso state data")
-        h3_resolution = 5
+        h3_resolution = 9
     else:
         print(f"Clipping to {area.radius_km}km radius around ({area.lat}, {area.lon})")
         circle = create_circle_buffer(area.lat, area.lon, area.radius_km)
