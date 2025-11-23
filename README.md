@@ -95,11 +95,17 @@ pip install -r requirements.txt
 
 **Note:** Data files can be obtained from any source (Google Earth Engine, other providers, or existing datasets). The tool processes whatever GeoTIFF files are placed in `data/raw/`.
 
-### Step 5: Configuration (Optional - Only for Data Acquisition)
+## Configuration
 
 **No configuration is required for core functionality** - the tool works with sensible defaults.
 
-The `config.yaml` file is **only needed** if you want to use the optional GEE export scripts to export data from Google Earth Engine. For normal usage with manually placed data files, you don't need any configuration.
+The `config.yaml` file is **only needed** if you want to use the optional GEE export scripts to export data from Google Earth Engine. For normal usage with manually placed data files, no configuration is needed.
+
+**Default Settings (work out of the box):**
+- Data directories: `data/raw`, `data/processed`
+- Output directories: `output/html`
+- H3 resolution: 7 for clipped areas, 9 for full state SOC map, 5 for full state suitability map
+- Processing: Caching enabled, snapshots disabled
 
 **If you need to export data from GEE:**
 
@@ -117,24 +123,10 @@ The `config.yaml` file is **only needed** if you want to use the optional GEE ex
 
 3. See `src/data_acquisition/README_TEMPLATE.md` for detailed instructions.
 
-**Note:** The core pipeline processes local GeoTIFF files and doesn't require any configuration.
-
-## Configuration
-
-**No configuration is required for core functionality** - the tool works with sensible defaults.
-
-The `config.yaml` file is **only needed** if you want to use the optional GEE export scripts (see `src/data_acquisition/README_TEMPLATE.md`). For normal usage with manually placed data files, no configuration is needed.
-
-**Default Settings (work out of the box):**
-- Data directories: `data/raw`, `data/processed`
-- Output directories: `output/html`
-- H3 resolution: 7 for clipped areas, 9 for full state SOC map, 5 for full state suitability map
-- Processing: Caching enabled, snapshots disabled
-
 **Note**: 
 - The pipeline automatically filters out old 3000m resolution SMAP files when 250m versions are available. Only the higher-resolution 250m files are used for processing.
 - Only scoring-required datasets are processed (soil_moisture, SOC b0/b10, pH b0/b10, soil_temperature). Other datasets (land_cover, soil_type) are automatically excluded from processing to optimize performance.
-- **Configuration is optional**: The tool works entirely with local data files and default settings. `config.yaml` is only needed for optional GEE export features.
+- The core pipeline processes local GeoTIFF files and doesn't require any configuration.
 
 ## Usage
 
