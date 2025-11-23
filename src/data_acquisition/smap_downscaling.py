@@ -1,7 +1,7 @@
 """
 SMAP Downscaling Module
 
-Bicubic resampling for SMAP data (3000m -> 250m).
+Bicubic resampling for SMAP data to 250m resolution.
 """
 
 from typing import Dict, Optional
@@ -10,7 +10,7 @@ import ee
 
 def resample_smap_to_250m(image: ee.Image, method: str = 'bicubic') -> ee.Image:
     """
-    Resample SMAP image from native resolution (~3000m) to 250m using specified method.
+    Resample SMAP image to 250m using specified method.
     
     Parameters
     ----------
@@ -68,7 +68,7 @@ def downscale_smap_datasets(
     
     for name, image in images.items():
         if name in smap_datasets:
-            print(f"  Downscaling {name} from ~3000m to 250m...")
+            print(f"  Downscaling {name} to 250m...")
             downscaled[name] = resample_smap_to_250m(image, method=method)
             print(f"  [OK] {name} downscaled to 250m using {method}")
         else:

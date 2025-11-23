@@ -58,10 +58,10 @@ DATASET_NAME_MAPPING = {
 # Datasets with native resolution > 250m will be exported at native resolution
 # Others will be exported at 250m
 # Note: SMAP datasets (soil_moisture, soil_temperature) are downscaled to 250m
-# before export, so they will export at 250m even though native is 3000m
+# before export, so they will export at 250m
 DATASET_NATIVE_RESOLUTIONS = {
-    'soil_moisture': 250,        # NASA SMAP native ~3000m, but downscaled to 250m
-    'soil_temperature': 250,     # NASA SMAP native ~3000m, but downscaled to 250m
+    'soil_moisture': 250,        # NASA SMAP downscaled to 250m
+    'soil_temperature': 250,     # NASA SMAP downscaled to 250m
     'soil_organic_carbon': 250,  # OpenLandMap native ~250m
     'soil_pH': 250,              # OpenLandMap native ~250m
     'soil_type': 250,            # OpenLandMap native ~250m
@@ -381,13 +381,13 @@ class GEEDataLoader:
         Load and standardize all datasets from config.
         
         Optionally downscales SMAP datasets (soil moisture and temperature) 
-        from 3000m to 250m resolution using bicubic resampling.
+        to 250m resolution using bicubic resampling.
 
         Parameters
         ----------
         downscale_smap : bool, optional
             If True (default), downscales SMAP datasets to 250m resolution using bicubic resampling.
-            If False, keeps SMAP datasets at native 3000m resolution.
+            If False, keeps SMAP datasets at their original resolution.
 
         Returns
         -------
@@ -699,8 +699,8 @@ def _run_debug_mode():
     
     print("\nTesting get_export_resolution():")
     test_resolutions = [
-        ('soil_moisture', 3000),  # Native > 250m
-        ('soil_temperature', 3000),  # Native > 250m
+        ('soil_moisture', 250),  # Downscaled to 250m
+        ('soil_temperature', 250),  # Downscaled to 250m
         ('soil_organic_carbon', 250),  # Native = 250m
         ('soil_pH', 250),  # Native = 250m
         ('soil_type', 250),  # Native = 250m

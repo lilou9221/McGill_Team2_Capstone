@@ -38,7 +38,7 @@ def generate_cache_key(lat: float, lon: float, radius_km: float, source_files: L
         Cache key (hexadecimal hash)
     """
     # Cache version: increment this to force cache invalidation across all instances
-    # Version 2: Added to force invalidation when switching from 3000m to 250m SMAP files
+    # Version 2: Added to force invalidation when switching to 250m SMAP files
     CACHE_VERSION = "v2"
     
     # Normalize coordinates to fixed precision for consistent hashing
@@ -503,7 +503,7 @@ def generate_dataframe_cache_key(
         Cache key (hexadecimal hash)
     """
     # Cache version: increment this to force cache invalidation across all instances
-    # Version 2: Added to force invalidation when switching from 3000m to 250m SMAP files
+    # Version 2: Added to force invalidation when switching to 250m SMAP files
     CACHE_VERSION = "v2"
     
     # Create hash components: cache version, conversion parameters, and source file info
@@ -861,7 +861,7 @@ def generate_h3_cache_key(
         Cache key (hexadecimal hash)
     """
     # Cache version: increment this to force cache invalidation across all instances
-    # Version 2: Added to force invalidation when switching from 3000m to 250m SMAP files
+    # Version 2: Added to force invalidation when switching to 250m SMAP files
     CACHE_VERSION = "v2"
     
     # Create hash components: cache version, H3 parameters, and DataFrame info
