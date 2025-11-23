@@ -132,7 +132,7 @@ def clip_raster_to_circle(
 def collect_geotiff_files(input_dir: Path, pattern: str = "*.tif") -> List[Path]:
     """
     Collect GeoTIFF files from a directory matching the given pattern.
-    Filters out old 3000m resolution files when 250m versions exist.
+    Filters out lower resolution files when higher resolution versions exist.
 
     Parameters
     ----------
@@ -144,14 +144,14 @@ def collect_geotiff_files(input_dir: Path, pattern: str = "*.tif") -> List[Path]
     Returns
     -------
     List[Path]
-        Sorted list of GeoTIFF file paths (preferring 250m over 3000m).
+        Sorted list of GeoTIFF file paths (preferring higher resolution versions).
     """
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
 
     all_tif_files = sorted(input_dir.glob(pattern))
     
-    # Filter: Prefer 250m over 3000m resolution files
+    # Filter: Prefer higher resolution files (250m) over lower resolution versions
     # For SOC and pH: include both b0 and b10 (used in scoring)
     # For soil_type: prefer b0 over deeper layers (b10, b30, b60)
     # Find all 250m files
@@ -162,12 +162,12 @@ def collect_geotiff_files(input_dir: Path, pattern: str = "*.tif") -> List[Path]
     
     tif_files = []
     for tif in all_tif_files:
-        # If it's a 3000m file, check if a 250m version exists
+        # If it's a lower resolution file, check if a 250m version exists
         if 'res_3000' in tif.name:
             # Check if corresponding 250m file exists
             potential_250m_name = tif.name.replace('res_3000', 'res_250')
             if potential_250m_name in res_250_files:
-                continue  # Skip this 3000m file, use 250m version instead
+                continue  # Skip this lower resolution file, use 250m version instead
         
         # For SOC and pH: include b0 and b10 (both used in scoring)
         # For soil_type: prefer b0 over b10, b30, b60

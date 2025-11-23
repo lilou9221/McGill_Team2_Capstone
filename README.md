@@ -124,7 +124,6 @@ The `config.yaml` file is **only needed** if you want to use the optional GEE ex
 3. See `src/data_acquisition/README_TEMPLATE.md` for detailed instructions.
 
 **Note**: 
-- The pipeline automatically filters out old 3000m resolution SMAP files when 250m versions are available. Only the higher-resolution 250m files are used for processing.
 - Only scoring-required datasets are processed (soil_moisture, SOC b0/b10, pH b0/b10, soil_temperature). Other datasets (land_cover, soil_type) are automatically excluded from processing to optimize performance.
 - The core pipeline processes local GeoTIFF files and doesn't require any configuration.
 
@@ -260,7 +259,6 @@ Verification helpers such as `verify_clipping_success` and `verify_clipped_data_
 
 ### SMAP Downscaling
 
-- SMAP soil moisture/temperature arrive at ~3000 m native resolution.
 - During `load_datasets()` the rasters are resampled to 250 m with bicubic interpolation (see `src/data/acquisition/smap_downscaling.py`).
 - All exports and downstream processing use the bicubic-resampled outputs at 250 m resolution.
 
