@@ -104,7 +104,7 @@ The `config.yaml` file is **only needed** if you want to use the optional GEE ex
 **Default Settings (work out of the box):**
 - Data directories: `data/raw`, `data/processed`
 - Output directories: `output/html`
-- H3 resolution: 7 for clipped areas, 9 for full state SOC map, 5 for full state suitability map
+- H3 resolution: 7 for clipped areas, 9 for full state
 - Processing: Caching enabled, snapshots disabled
 
 **If you need to export data from GEE:**
@@ -166,7 +166,7 @@ python src/main.py --help
 Key processing flags:
 
 - `--lat / --lon / --radius` — Skip prompts and inject AOI coordinates directly. Default radius is 100 km.
-- `--h3-resolution` — Choose aggregation granularity for clipped areas (higher = more hexes, default 7). Full state uses resolution 5 for suitability map and resolution 9 for SOC map automatically.
+- `--h3-resolution` — Choose aggregation granularity for clipped areas (higher = more hexes, default 7). Full state uses resolution 9 automatically.
 - `--config` — Point the pipeline at an alternate configuration document.
 
 ## Project Structure
