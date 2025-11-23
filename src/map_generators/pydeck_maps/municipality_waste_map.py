@@ -204,22 +204,24 @@ def create_municipality_waste_deck(
     
     # Round production and residue to nearest integer for display
     # Format as N/A if area > 0 but production/residue = 0
+    # Format numbers with comma separators for thousands
     if data_type == "production":
         merged_gdf["display_value_raw"] = merged_gdf[value_col].round().astype(int)
-        # Format as string: show "N/A" if area > 0 but production = 0, otherwise show the number
+        # Format as string: show "N/A" if area > 0 but production = 0, otherwise show the number with commas
         merged_gdf["display_value"] = merged_gdf.apply(
-            lambda row: "N/A" if row["production_is_na"] else str(row["display_value_raw"]),
+            lambda row: "N/A" if row["production_is_na"] else f"{row['display_value_raw']:,}",
             axis=1
         )
     elif data_type == "residue":
         merged_gdf["display_value_raw"] = merged_gdf[value_col].round().astype(int)
-        # Format as string: show "N/A" if area > 0 but residue = 0, otherwise show the number
+        # Format as string: show "N/A" if area > 0 but residue = 0, otherwise show the number with commas
         merged_gdf["display_value"] = merged_gdf.apply(
-            lambda row: "N/A" if row["residue_is_na"] else str(row["display_value_raw"]),
+            lambda row: "N/A" if row["residue_is_na"] else f"{row['display_value_raw']:,}",
             axis=1
         )
     else:  # area
-        merged_gdf["display_value"] = merged_gdf[value_col]
+        # Format area with comma separators
+        merged_gdf["display_value"] = merged_gdf[value_col].apply(lambda x: f"{x:,.0f}" if pd.notna(x) else "0")
 
     # Include only necessary columns in GeoJSON (optimize memory)
     geojson_data = json.loads(
