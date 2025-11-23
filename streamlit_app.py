@@ -549,9 +549,10 @@ if st.session_state.analysis_results is not None:
                 st.pydeck_chart(deck, use_container_width=True)
                 
                 # Display metrics for all three data types
+                # Production and residue are already integers, round for display
                 total_area = merged_gdf["total_crop_area_ha"].sum()
-                total_production = merged_gdf["total_crop_production_ton"].sum()
-                total_residue = merged_gdf["total_crop_residue_ton"].sum()
+                total_production = int(round(merged_gdf["total_crop_production_ton"].sum()))
+                total_residue = int(round(merged_gdf["total_crop_residue_ton"].sum()))
                 
                 # Show top municipalities based on selected data type
                 if data_type == "area":
@@ -573,6 +574,9 @@ if st.session_state.analysis_results is not None:
                         top_col: col_label,
                     })
                 )
+                # Round production and residue to integers
+                if data_type in ["production", "residue"]:
+                    top_municipalities[col_label] = top_municipalities[col_label].round().astype(int)
                 
                 c1, c2, c3 = st.columns([1, 1, 1])
                 with c1:
@@ -583,8 +587,13 @@ if st.session_state.analysis_results is not None:
                     st.metric("Total residue (ton)", f"{total_residue:,.0f}")
                 
                 st.write(f"Top municipalities by {col_label}:")
+                # Format based on data type - integers for production/residue, decimals for area
+                if data_type in ["production", "residue"]:
+                    format_dict = {col_label: "{:,.0f}"}
+                else:
+                    format_dict = {col_label: "{:,.0f}"}
                 st.dataframe(
-                    top_municipalities.style.format({col_label: "{:,.0f}"}),
+                    top_municipalities.style.format(format_dict),
                     use_container_width=True,
                 )
             except Exception as e:
