@@ -314,6 +314,7 @@ if st.session_state.get("analysis_results"):
     df = pd.read_csv(csv_path)
     map_paths = st.session_state.analysis_results["map_paths"]
 
+    # Create tabs - Streamlit maintains tab state automatically
     farmer_tab, investor_tab = st.tabs(["Farmer Perspective", "Investor Perspective"])
 
     # ========================================================
@@ -487,71 +488,75 @@ if st.session_state.get("analysis_results"):
     # INVESTOR TAB (unchanged)
     # ========================================================
     with investor_tab:
-        st.markdown("### Crop Residue Availability – Biochar Feedstock Opportunity")
+        # Use container to isolate widget interactions and prevent tab resets
+        investor_container = st.container()
+        with investor_container:
+            st.markdown("### Crop Residue Availability – Biochar Feedstock Opportunity")
 
-        boundaries_dir = PROJECT_ROOT / "data" / "boundaries" / "BR_Municipios_2024"
-        csv_path = PROJECT_ROOT / "data" / "crop_data" / "Updated_municipality_crop_production_data.csv"
+            boundaries_dir = PROJECT_ROOT / "data" / "boundaries" / "BR_Municipios_2024"
+            csv_path = PROJECT_ROOT / "data" / "crop_data" / "Updated_municipality_crop_production_data.csv"
 
-        if not boundaries_dir.exists() or not csv_path.exists():
-            st.warning("Investor map data missing.")
-            st.info("Required:\n• data/boundaries/BR_Municipios_2024/\n• data/crop_data/Updated_municipality_crop_production_data.csv")
-        else:
-            try:
-                from src.map_generators.pydeck_maps.municipality_waste_map import (
-                    prepare_investor_crop_area_geodata,
-                    create_municipality_waste_deck,
+            if not boundaries_dir.exists() or not csv_path.exists():
+                st.warning("Investor map data missing.")
+                st.info("Required:\n• data/boundaries/BR_Municipios_2024/\n• data/crop_data/Updated_municipality_crop_production_data.csv")
+            else:
+                try:
+                    from src.map_generators.pydeck_maps.municipality_waste_map import (
+                        prepare_investor_crop_area_geodata,
+                        create_municipality_waste_deck,
+                    )
+                except Exception as e:
+                    st.error("Failed to load investor map module")
+                    st.code(str(e))
+                    st.stop()
+
+                @st.cache_data(show_spinner="Loading crop residue data (first time only)...")
+                def get_gdf():
+                    return prepare_investor_crop_area_geodata(
+                        boundaries_dir,
+                        csv_path,
+                        simplify_tolerance=0.05
+                    )
+
+                gdf = get_gdf()
+
+                # Use a unique, stable key to prevent tab resets when radio button changes
+                data_type = st.radio(
+                    "Display:",
+                    ["area", "production", "residue"],
+                    format_func=lambda x: {"area":"Planted Area (ha)", "production":"Production (tons)", "residue":"Residue (tons)"}[x],
+                    horizontal=True,
+                    key="investor_pov_data_type_radio"
                 )
-            except Exception as e:
-                st.error("Failed to load investor map module")
-                st.code(str(e))
-                st.stop()
 
-            @st.cache_data(show_spinner="Loading crop residue data (first time only)...")
-            def get_gdf():
-                return prepare_investor_crop_area_geodata(
-                    boundaries_dir,
-                    csv_path,
-                    simplify_tolerance=0.05
-                )
+                deck = create_municipality_waste_deck(gdf, data_type=data_type)
+                st.pydeck_chart(deck, use_container_width=True)
 
-            gdf = get_gdf()
-
-            data_type = st.radio(
-                "Display:",
-                ["area", "production", "residue"],
-                format_func=lambda x: {"area":"Planted Area (ha)", "production":"Production (tons)", "residue":"Residue (tons)"}[x],
-                horizontal=True,
-                key="investor_radio"
-            )
-
-            deck = create_municipality_waste_deck(gdf, data_type=data_type)
-            st.pydeck_chart(deck, use_container_width=True)
-
-            # Show legend for all data types with appropriate labels
-            legend_titles = {
-                "area": "Planted Crop Area (ha)",
-                "production": "Crop Production (tons)",
-                "residue": "Available Crop Residue (tons/year)"
-            }
-            legend_title = legend_titles.get(data_type, "Crop Data")
-            
-            st.markdown(f"""
-                <div class="legend-box">
-                    <div class="legend-title">{legend_title}</div>
-                    <div class="legend-row">
-                        <div class="legend-item"><span class="legend-color" style="background:#00C85A;"></span>Low (0-25%)</div>
-                        <div class="legend-item"><span class="legend-color" style="background:#3F9666;"></span>Low-Moderate (25-50%)</div>
-                        <div class="legend-item"><span class="legend-color" style="background:#7F6473;"></span>Moderate-High (50-75%)</div>
-                        <div class="legend-item"><span class="legend-color" style="background:#BF327F;"></span>High (75-100%)</div>
+                # Show legend for all data types with appropriate labels
+                legend_titles = {
+                    "area": "Planted Crop Area (ha)",
+                    "production": "Crop Production (tons)",
+                    "residue": "Available Crop Residue (tons/year)"
+                }
+                legend_title = legend_titles.get(data_type, "Crop Data")
+                
+                st.markdown(f"""
+                    <div class="legend-box">
+                        <div class="legend-title">{legend_title}</div>
+                        <div class="legend-row">
+                            <div class="legend-item"><span class="legend-color" style="background:#00C85A;"></span>Low (0-25%)</div>
+                            <div class="legend-item"><span class="legend-color" style="background:#3F9666;"></span>Low-Moderate (25-50%)</div>
+                            <div class="legend-item"><span class="legend-color" style="background:#7F6473;"></span>Moderate-High (50-75%)</div>
+                            <div class="legend-item"><span class="legend-color" style="background:#BF327F;"></span>High (75-100%)</div>
+                        </div>
+                        <p style="font-size: 0.9rem; color: #666; margin-top: 12px;"><em>Colors represent relative values (percentage of maximum in dataset)</em></p>
                     </div>
-                    <p style="font-size: 0.9rem; color: #666; margin-top: 12px;"><em>Colors represent relative values (percentage of maximum in dataset)</em></p>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-            c1, c2, c3 = st.columns(3)
-            with c1: st.metric("Total Crop Area", f"{gdf['total_crop_area_ha'].sum():,.0f} ha")
-            with c2: st.metric("Total Production", f"{gdf['total_crop_production_ton'].sum():,.0f} t")
-            with c3: st.metric("Total Residue", f"{gdf['total_crop_residue_ton'].sum():,.0f} t")
+                c1, c2, c3 = st.columns(3)
+                with c1: st.metric("Total Crop Area", f"{gdf['total_crop_area_ha'].sum():,.0f} ha")
+                with c2: st.metric("Total Production", f"{gdf['total_crop_production_ton'].sum():,.0f} t")
+                with c3: st.metric("Total Residue", f"{gdf['total_crop_residue_ton'].sum():,.0f} t")
 
 else:
     st.info("Select your area and click **Run Analysis** (first run takes 2–6 minutes)")
