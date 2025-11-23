@@ -2,7 +2,7 @@
 # DISPLAY RESULTS – CLEAN TWO-TAB VERSION WITH LEGENDS
 # ============================================================
 
-if st.session_state.analysis_results:
+if st.session_state.get("analysis_results"):
 
     csv_path = Path(st.session_state.analysis_results["csv_path"])
     df = pd.read_csv(csv_path)
