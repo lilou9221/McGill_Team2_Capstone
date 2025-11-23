@@ -191,6 +191,12 @@ def create_municipality_waste_deck(
     merged_gdf = merged_gdf.copy()
     vmax = merged_gdf[value_col].max() if merged_gdf[value_col].max() > 0 else 1
     
+    # Ensure N/A flags exist (defensive check for cached data or older versions)
+    if "production_is_na" not in merged_gdf.columns:
+        merged_gdf["production_is_na"] = (merged_gdf["total_crop_area_ha"] > 0) & (merged_gdf["total_crop_production_ton"] == 0)
+    if "residue_is_na" not in merged_gdf.columns:
+        merged_gdf["residue_is_na"] = (merged_gdf["total_crop_area_ha"] > 0) & (merged_gdf["total_crop_residue_ton"] == 0)
+    
     # Calculate colors only for the selected data type (optimize memory)
     merged_gdf["fill_color"] = merged_gdf[value_col].apply(
         lambda v: _value_to_color(v, vmax)
