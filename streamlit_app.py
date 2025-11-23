@@ -59,35 +59,134 @@ def get_config():
 config = get_config()
 
 # ============================================================
-# BEAUTIFUL STYLING (my final design)
+# GLOBAL STYLING (updated for white background + black text)
 # ============================================================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    html, body, .stApp {font-family: 'Inter', sans-serif;}
-    .header-title {font-size: 3.4rem; font-weight: 700; text-align: center; color: #173a30; margin: 2rem 0 0.5rem;}
-    .header-subtitle {text-align: center; color: #444; font-size: 1.3rem; margin-bottom: 3rem;}
-    section[data-testid="stSidebar"] {background-color: #173a30 !important;}
-    section[data-testid="stSidebar"] * {color: white !important;}
-    .stButton > button {background-color: #64955d !important; color: white !important; border-radius: 999px; font-weight: 600; height: 3.2em;}
-    .stButton > button:hover {background-color: #527a48 !important;}
-    .metric-card {
-        background: white; padding: 1.8rem; border-radius: 14px;
-        border-left: 6px solid #64955d; box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+
+    html, body, .stApp {
+        font-family: 'Inter', sans-serif;
+        background-color: #FFFFFF !important;
+        color: #000 !important;
+    }
+
+    /* Ensure ALL text is black (except sidebar) */
+    body, html, .stApp, div, span, p, h1, h2, h3, h4, h5, h6 {
+        color: #000 !important;
+    }
+
+    /* Sidebar remains perfect (DO NOT TOUCH per user request) */
+    section[data-testid="stSidebar"] {
+        background-color: #173a30 !important;
+    }
+    section[data-testid="stSidebar"] * {
+        color: white !important;
+    }
+
+    .header-title {
+        font-size: 3.4rem;
+        font-weight: 700;
         text-align: center;
+        color: #173a30;
+        margin: 2rem 0 0.5rem;
     }
-    .metric-card h4 {margin: 0 0 0.5rem; color: #173a30; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.8px;}
-    .metric-card p {margin: 0; font-size: 2.4rem; font-weight: 700; color: #333;}
+
+    .header-subtitle {
+        text-align: center;
+        color: #444444;
+        font-size: 1.3rem;
+        margin-bottom: 3rem;
+    }
+
+    .stButton > button {
+        background-color: #64955d !important;
+        color: white !important;
+        border-radius: 999px;
+        font-weight: 600;
+        height: 3.2em;
+    }
+
+    .stButton > button:hover {
+        background-color: #527a48 !important;
+    }
+
+    .metric-card {
+        background: white;
+        padding: 1.8rem;
+        border-radius: 14px;
+        border-left: 6px solid #64955d;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+        text-align: center;
+        color: #000 !important;
+    }
+
+    .metric-card h4 {
+        margin: 0 0 0.5rem;
+        color: #173a30;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+    }
+
+    .metric-card p {
+        margin: 0;
+        font-size: 2.4rem;
+        font-weight: 700;
+        color: #333333;
+    }
+
+    /* Legend box - all text black */
     .legend-box {
-        background: white; padding: 28px; border-radius: 16px;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.1); max-width: 760px;
-        margin: 50px auto; text-align: center; border: 1px solid #eee;
+        background: white;
+        padding: 28px;
+        border-radius: 16px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        max-width: 760px;
+        margin: 50px auto;
+        text-align: center;
+        border: 1px solid #eee;
+        color: #000 !important;
     }
-    .legend-title {font-size: 1.4rem; font-weight: 700; color: #173a30; margin-bottom: 18px;}
-    .legend-row {display: flex; justify-content: center; flex-wrap: wrap; gap: 24px;}
-    .legend-item {display: flex; align-items: center; gap: 12px; font-size: 1.05rem; font-weight: 500;}
-    .legend-color {width: 38px; height: 24px; border-radius: 6px; display: inline-block;}
-    .footer {text-align: center; padding: 6rem 0 3rem; color: #666; border-top: 1px solid #eee; margin-top: 8rem; font-size: 0.95rem;}
+
+    .legend-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #173a30 !important;
+        margin-bottom: 18px;
+    }
+
+    .legend-row {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 24px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 1.05rem;
+        font-weight: 500;
+        color: #000 !important;
+    }
+
+    .legend-color {
+        width: 38px;
+        height: 24px;
+        border-radius: 6px;
+        display: inline-block;
+    }
+
+    .footer {
+        text-align: center;
+        padding: 6rem 0 3rem;
+        color: #666;
+        border-top: 1px solid #eee;
+        margin-top: 8rem;
+        font-size: 0.95rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -117,7 +216,7 @@ with st.sidebar:
         st.rerun()
 
 # ============================================================
-# RUN ANALYSIS PIPELINE (your code — untouched)
+# RUN ANALYSIS PIPELINE
 # ============================================================
 if run_btn:
     st.session_state.analysis_results = None
@@ -183,7 +282,7 @@ if run_btn:
         st.session_state.analysis_running = False
 
 # ============================================================
-# DISPLAY RESULTS — MY FINAL VISUALS + YOUR LOGIC
+# DISPLAY RESULTS
 # ============================================================
 if st.session_state.get("analysis_results"):
     csv_path = Path(st.session_state.analysis_results["csv_path"])
@@ -193,21 +292,39 @@ if st.session_state.get("analysis_results"):
     farmer_tab, investor_tab = st.tabs(["Farmer Perspective", "Investor Perspective"])
 
     # ========================================================
-    # FARMER TAB — BEAUTIFUL METRICS + LEGENDS
+    # FARMER TAB
     # ========================================================
     with farmer_tab:
         st.markdown("### Soil Health & Biochar Suitability Insights")
 
         col1, col2, col3 = st.columns(3)
+
         with col1:
-            st.markdown(f'<div class="metric-card"><h4>Hexagons Analyzed</h4><p>{len(df):,}</p></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="metric-card"><h4>Hexagons Analyzed</h4><p>{len(df):,}</p></div>',
+                unsafe_allow_html=True
+            )
+
         with col2:
             mean_score = df["suitability_score"].mean()
-            st.markdown(f'<div class="metric-card"><h4>Mean Suitability Score</h4><p>{mean_score:.2f}</p></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="metric-card"><h4>Mean Suitability Score</h4><p>{mean_score:.2f}</p></div>',
+                unsafe_allow_html=True
+            )
+
+        # UPDATED PER YOUR REQUEST
         with col3:
             high = (df["suitability_score"] >= 7.0).sum()
             pct = high / len(df) * 100
-            st.markdown(f'<div class="metric-card"><h4>Highly Suitable (≥7.0)</h4><p>{high:,}<br><small>({pct:.1f}%)</small></p></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'''
+                <div class="metric-card">
+                    <h4>High Suitability (≥7.0)</h4>
+                    <p>{high:,}<br><small>({pct:.1f}%)</small></p>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
 
         tab1, tab2, tab3, tab4, rec_tab = st.tabs([
             "Biochar Suitability", "Soil Organic Carbon", "Soil pH", "Soil Moisture", "Top 10 Recommendations"
@@ -305,7 +422,7 @@ if st.session_state.get("analysis_results"):
         )
 
     # ========================================================
-    # INVESTOR TAB — LAZY IMPORT = INSTANT STARTUP
+    # INVESTOR TAB (unchanged)
     # ========================================================
     with investor_tab:
         st.markdown("### Crop Residue Availability – Biochar Feedstock Opportunity")
@@ -317,7 +434,6 @@ if st.session_state.get("analysis_results"):
             st.warning("Investor map data missing.")
             st.info("Required:\n• data/boundaries/BR_Municipios_2024/\n• data/crop_data/Updated_municipality_crop_production_data.csv")
         else:
-            # IMPORT ONLY WHEN USER OPENS THIS TAB → app starts instantly!
             try:
                 from src.map_generators.pydeck_maps.municipality_waste_map import (
                     prepare_investor_crop_area_geodata,
@@ -352,7 +468,7 @@ if st.session_state.get("analysis_results"):
             if data_type == "residue":
                 st.markdown("""
                     <div class="legend-box">
-                       ix <div class="legend-title">Available Crop Residue (tons/year)</div>
+                        <div class="legend-title">Available Crop Residue (tons/year)</div>
                         <div class="legend-row">
                             <div class="legend-item"><span class="legend-color" style="background:#FFFFCC;"></span>Low</div>
                             <div class="legend-item"><span class="legend-color" style="background:#C7E9B4;"></span>Moderate</div>
