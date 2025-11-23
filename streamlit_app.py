@@ -130,8 +130,8 @@ if st.session_state.analysis_results:
     map_paths = {k: Path(v) for k, v in st.session_state.analysis_results["map_paths"].items()}
 
     farmer_tab, investor_tab = st.tabs([
-        "Farmer – Soil Health & Biochar Recommendations",
-        "Investor – Crop Residue Opportunity"
+        "Farmer",
+        "Investor"
     ])
 
     # ==================== FARMER TAB ====================
@@ -254,8 +254,8 @@ if st.session_state.analysis_results:
                         simplify_tolerance=0.008
                     )
 
-                data_type = st.radio("Show:", ["area", "production", "residue"],
-                                   format_func=lambda x: {"area": "Area (ha)", "production": "Production (t)", "residue": "Residue (t)"}[x],
+                data_type = st.radio("Show:", ["Crop area", "Crop production", "Crop residue"],
+                                   format_func=lambda x: {"Crop area": "Area (ha)", "Crop production": "Crop Production (tons)", "Crop residue": "Crop Residue (tons)"}[x],
                                    horizontal=True)
 
                 gdf = load_investor_data()
