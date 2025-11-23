@@ -198,9 +198,21 @@ def create_municipality_waste_deck(
         merged_gdf["residue_is_na"] = (merged_gdf["total_crop_area_ha"] > 0) & (merged_gdf["total_crop_residue_ton"] == 0)
     
     # Calculate colors only for the selected data type (optimize memory)
-    merged_gdf["fill_color"] = merged_gdf[value_col].apply(
-        lambda v: _value_to_color(v, vmax)
-    )
+    # Set grey color for N/A values in production and residue maps
+    if data_type == "production":
+        merged_gdf["fill_color"] = merged_gdf.apply(
+            lambda row: (128, 128, 128, 180) if row["production_is_na"] else _value_to_color(row[value_col], vmax),
+            axis=1
+        )
+    elif data_type == "residue":
+        merged_gdf["fill_color"] = merged_gdf.apply(
+            lambda row: (128, 128, 128, 180) if row["residue_is_na"] else _value_to_color(row[value_col], vmax),
+            axis=1
+        )
+    else:  # area
+        merged_gdf["fill_color"] = merged_gdf[value_col].apply(
+            lambda v: _value_to_color(v, vmax)
+        )
     
     # Round production and residue to nearest integer for display
     # Format as N/A if area > 0 but production/residue = 0
