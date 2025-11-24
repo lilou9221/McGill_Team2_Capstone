@@ -1,0 +1,17 @@
+Index,Type,Origin,Cellulose,Hemicellulose,Lignin,Ash content,Moisture content,O (%),C (%),Fixed carbon content,Volatile matter,Final Temperature,Heating Rate,"""Residence Time"" (min)",Type of Reactor,Biochar Yield (%),H/C ratio,O/C ratio,pH,pore size,Soil Challenges to amend,Challenge_High_Temperature,Challenge_High_pH,Challenge_Low_Moisture,Challenge_Low_OC,Challenge_Low_pH
+5,Coffee Silverskin,Brazil,33.7,4.7,33.1,6.3,9.4,22.06,56.9,18.0,,,,,,,,,,,Low OC,False,False,False,True,False
+9,Corn Straw,Brazil,38.0,30.0,17.0,6.95,10.0,42.53,43.05,17.2,75.9,916-950,,,,,,,,,High Temperature,True,False,False,False,False
+10,Rice Husk,Brazil,34.0,26.0,20.0,16.9,10.0,37.45,38.4,20.9,62.2,916-950,,,,,,,,,High Temperature,True,False,False,False,False
+11,Soybean Straw,Brazil,37.0,31.0,18.0,4.7,10.0,42.18,45.51,19.8,75.5,916-950,,,,,,,,,High Temperature,True,False,False,False,False
+36,Corn cob,China,28.7,39.3,19.6,4.9,2.4,27.63,67.21,49.1,43.6,300,10.0,60.0,fixed bed,77.3,0.8,0.31,8.1,61.8,High Temperature; Low pH; Low OC,True,False,False,True,True
+37,Corn cob,China,28.7,39.3,19.6,5.4,2.1,15.72,79.65,71.7,20.8,400,10.0,60.0,fixed bed,36.9,0.6,0.15,9.1,180.1,High Temperature; Low pH; Low OC,True,False,False,True,True
+38,Corn cob,China,28.7,39.3,19.6,8.2,1.6,12.62,83.27,81.6,8.6,500,10.0,60.0,fixed bed,23.3,0.48,0.11,9.3,212.6,Low Moisture; High Temperature; Low pH; Low OC,True,False,True,True,True
+39,Corn cob,China,28.7,39.3,19.6,8.7,1.7,12.52,84.31,82.4,7.2,600,10.0,60.0,fixed bed,21.7,0.34,0.11,10.4,192.9,Low Moisture; High Temperature; Low OC,True,False,True,True,False
+44,Spent Coffee Ground,Spain,14.9,41.4,33.3,2.2,10.5,19.66,62.63,20.9,76.7,300,15.0,60.0,fixed bed,24.0,0.92,0.31,3.5,,High pH; Low OC,False,True,False,True,False
+45,Spent Coffee Ground,Spain,14.9,41.4,33.3,2.2,10.5,13.16,69.56,20.9,76.7,400,15.0,60.0,fixed bed,23.0,0.57,0.19,3.8,,High pH; Low OC,False,True,False,True,False
+46,Spent Coffee Ground,Spain,14.9,41.4,33.3,2.2,10.5,9.87,72.76,20.9,76.7,500,15.0,60.0,fixed bed,22.0,0.45,0.14,4.0,,High pH; Low OC,False,True,False,True,False
+47,Spent Coffee Ground,Spain,14.9,41.4,33.3,2.2,10.5,7.9,74.4,,76.7,600,15.0,60.0,fixed bed,21.0,0.36,0.11,3.7,,High pH; Low OC,False,True,False,True,False
+48,Coffee Silverskin,Spain,33.7,4.7,33.1,6.3,9.4,22.06,56.9,18.9,74.4,300,15.0,60.0,fixed bed,40.0,0.87,0.3,3.9,,High pH,False,True,False,False,False
+49,Coffee Silverskin,Spain,33.7,4.7,33.1,6.3,9.4,19.27,57.21,20.9,74.4,400,15.0,60.0,fixed bed,35.0,0.62,0.23,3.9,,High pH,False,True,False,False,False
+50,Coffee Silverskin,Spain,33.7,4.7,33.1,6.3,9.4,16.8,60.63,,74.4,500,15.0,60.0,fixed bed,31.5,0.47,0.17,4.2,,High Temperature; High pH; Low OC,True,True,False,True,False
+51,Coffee Silverskin,Spain,33.7,4.7,33.1,6.3,9.4,13.78,64.68,,74.4,600,15.0,60.0,fixed bed,28.0,0.3,0.12,4.3,,High Temperature; High pH; Low OC,True,True,False,True,False
