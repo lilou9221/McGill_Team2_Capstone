@@ -753,7 +753,7 @@ if csv_path and df is not None and map_paths:
                 )
 
                 deck = create_municipality_waste_deck(gdf, data_type=data_type)
-                st.pydeck_chart(deck, width='stretch')
+                st.pydeck_chart(deck, use_container_width=True)
 
                 # Show legend for all data types with appropriate labels
                 legend_titles = {
