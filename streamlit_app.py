@@ -744,13 +744,21 @@ if csv_path and df is not None and map_paths:
                 gdf = get_gdf()
 
                 # Use a unique, stable key to prevent tab resets when radio button changes
-                data_type = st.radio(
+                data_type_radio = st.radio(
                     "Display:",
                     ["Crop area", "Crop production", "Crop residue"],
                     format_func=lambda x: {"Crop area":"Crop Area (ha)", "Crop production":"Crop Production (tons)", "Crop residue":"Crop Residue (tons)"}[x],
                     horizontal=True,
                     key="investor_pov_data_type_radio"
                 )
+                
+                # Map radio button values to function parameter values
+                data_type_map = {
+                    "Crop area": "area",
+                    "Crop production": "production",
+                    "Crop residue": "residue"
+                }
+                data_type = data_type_map.get(data_type_radio, "area")
 
                 deck = create_municipality_waste_deck(gdf, data_type=data_type)
                 st.pydeck_chart(deck, use_container_width=True)
