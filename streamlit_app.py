@@ -477,15 +477,15 @@ elif not st.session_state.get("analysis_running"):
         df = load_results_csv(str(csv_path))
         map_paths = st.session_state.analysis_results["map_paths"]
 
-if csv_path and df is not None and map_paths:
+# Create tabs - Streamlit maintains tab state automatically
+# Tabs are always created to prevent tab resets on reruns
+farmer_tab, investor_tab = st.tabs(["Farmer Perspective", "Investor Perspective"])
 
-    # Create tabs - Streamlit maintains tab state automatically
-    farmer_tab, investor_tab = st.tabs(["Farmer Perspective", "Investor Perspective"])
-
-    # ========================================================
-    # FARMER TAB
-    # ========================================================
-    with farmer_tab:
+# ========================================================
+# FARMER TAB
+# ========================================================
+with farmer_tab:
+    if csv_path and df is not None and map_paths:
         st.markdown("### Soil Health & Biochar Suitability Insights")
 
         col1, col2, col3 = st.columns(3)
@@ -701,11 +701,13 @@ if csv_path and df is not None and map_paths:
             "text/csv",
             width='stretch'
         )
+    else:
+        st.info("💡 **Tip:** Run the analysis to view soil health and biochar suitability insights.")
 
-    # ========================================================
-    # INVESTOR TAB (unchanged)
-    # ========================================================
-    with investor_tab:
+# ========================================================
+# INVESTOR TAB
+# ========================================================
+with investor_tab:
         # Use container to isolate widget interactions and prevent tab resets
         investor_container = st.container()
         with investor_container:
