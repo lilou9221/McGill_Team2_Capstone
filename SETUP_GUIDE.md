@@ -40,32 +40,52 @@ pip install -r requirements.txt
 
 ### 3. Prepare Data Files
 
-**Manual Data Placement:**
+**Automatic Download from Google Drive (Recommended):**
 
-1. **Obtain GeoTIFF data files** from any source (Google Earth Engine, other providers, or existing datasets).
+All required data files are hosted in a shared Google Drive folder and can be downloaded automatically:
 
-2. **Place files in `data/raw/` directory:**
-   ```bash
-   data/raw/
-   ├── SOC_res_250_b0.tif
-   ├── SOC_res_250_b10.tif
-   ├── soil_moisture_res_250_sm_surface.tif
-   ├── soil_pH_res_250_b0.tif
-   ├── soil_pH_res_250_b10.tif
-   └── soil_temp_res_250_soil_temp_layer1.tif
-   ```
+```bash
+# Download all required data files from Google Drive
+python scripts/download_assets.py
+```
 
-3. **Required files for biochar suitability scoring:**
-   - `soil_moisture_res_250_sm_surface.tif` - Soil moisture
-   - `SOC_res_250_b0.tif` - Soil Organic Carbon (surface)
-   - `SOC_res_250_b10.tif` - Soil Organic Carbon (10cm depth)
-   - `soil_pH_res_250_b0.tif` - Soil pH (surface)
-   - `soil_pH_res_250_b10.tif` - Soil pH (10cm depth)
-   - `soil_temp_res_250_soil_temp_layer1.tif` - Soil temperature
+This will download:
+- 5 shapefile components for Brazilian municipality boundaries to `data/boundaries/BR_Municipios_2024/`
+- 1 crop production CSV file to `data/crop_data/`
+- 6 GeoTIFF files for soil properties to `data/raw/`
 
-4. **File naming:** The tool recognizes files by keywords in their names (e.g., "moisture", "SOC", "ph", "temp"). Files should be GeoTIFF format (.tif or .tiff extension).
+**Required files for biochar suitability scoring:**
+- `soil_moisture_res_250_sm_surface.tif` - Soil moisture
+- `SOC_res_250_b0.tif` - Soil Organic Carbon (surface)
+- `SOC_res_250_b10.tif` - Soil Organic Carbon (10cm depth)
+- `soil_pH_res_250_b0.tif` - Soil pH (surface)
+- `soil_pH_res_250_b10.tif` - Soil pH (10cm depth)
+- `soil_temp_res_250_soil_temp_layer1.tif` - Soil temperature
 
-**Note:** Data acquisition is done manually outside the codebase. You can obtain data from any source as long as files are in GeoTIFF format and placed in `data/raw/`.
+**Manual Data Placement (Alternative):**
+
+If you prefer to place files manually, ensure the following structure:
+
+```bash
+data/
+├── raw/
+│   ├── SOC_res_250_b0.tif
+│   ├── SOC_res_250_b10.tif
+│   ├── soil_moisture_res_250_sm_surface.tif
+│   ├── soil_pH_res_250_b0.tif
+│   ├── soil_pH_res_250_b10.tif
+│   └── soil_temp_res_250_soil_temp_layer1.tif
+├── boundaries/BR_Municipios_2024/
+│   ├── BR_Municipios_2024.shp
+│   ├── BR_Municipios_2024.dbf
+│   ├── BR_Municipios_2024.shx
+│   ├── BR_Municipios_2024.prj
+│   └── BR_Municipios_2024.cpg
+└── crop_data/
+    └── Updated_municipality_crop_production_data.csv
+```
+
+**Note:** The Streamlit app will automatically download missing files on first run. See `STREAMLIT_DEPLOYMENT.md` for more details.
 
 ### 4. (Optional) Configuration
 
