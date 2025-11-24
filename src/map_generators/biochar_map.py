@@ -14,7 +14,7 @@ from src.map_generators.color_scheme import get_biochar_suitability_color_rgb
 
 
 def create_biochar_suitability_map(
-    df: pd.DataFrame,
+    df: pd.DataFrame | Path,
     output_path: Path,
     max_file_size_mb: float = 100.0,
     use_h3: bool = True,
@@ -27,8 +27,9 @@ def create_biochar_suitability_map(
     
     Parameters
     ----------
-    df : pd.DataFrame
-        DataFrame with biochar suitability scores (must have 'lon', 'lat', 'biochar_suitability_score')
+    df : pd.DataFrame or Path
+        DataFrame with biochar suitability scores, or Path to CSV file.
+        Must have 'lon', 'lat', 'biochar_suitability_score' columns
     output_path : Path
         Path to save HTML file
     max_file_size_mb : float, optional
@@ -47,6 +48,14 @@ def create_biochar_suitability_map(
     dict
         Map generation info with keys: 'method', 'file_size_mb', 'file_path'
     """
+    # Load data if Path provided (for consistency with other maps)
+    if isinstance(df, Path):
+        if not df.exists():
+            raise FileNotFoundError(f"Suitability scores file not found: {df}. Please run the analysis first.")
+        print(f"  Loading suitability scores from: {df.name}")
+        df = pd.read_csv(df)
+        print(f"    Loaded {len(df):,} rows from suitability scores")
+    
     # Validate required columns
     required_cols = ['lon', 'lat', 'biochar_suitability_score']
     missing_cols = [col for col in required_cols if col not in df.columns]
@@ -59,12 +68,6 @@ def create_biochar_suitability_map(
     if df.empty:
         raise ValueError("No valid biochar suitability scores found in DataFrame")
     
-    # Calculate center if not provided
-    if center_lat is None:
-        center_lat = df['lat'].mean()
-    if center_lon is None:
-        center_lon = df['lon'].mean()
-    
     # Check if H3 indexes are available
     has_h3 = use_h3 and 'h3_index' in df.columns
     
@@ -76,11 +79,19 @@ def create_biochar_suitability_map(
     if has_h3:
         hexagon_data = _prepare_biochar_hexagon_data(df)
         layer = _create_biochar_h3_hexagon_layer(hexagon_data)
+        prepared_data = hexagon_data
     else:
         point_data = _prepare_biochar_point_data(df)
         layer = _create_biochar_point_layer(point_data)
+        prepared_data = point_data
     
-    # Create view state
+    # Calculate center from prepared data if not provided (consistent with other maps)
+    if center_lat is None:
+        center_lat = prepared_data['lat'].mean()
+    if center_lon is None:
+        center_lon = prepared_data['lon'].mean()
+    
+    # Create view state (use provided zoom_start to match other maps)
     view_state = pdk.ViewState(
         latitude=center_lat,
         longitude=center_lon,
@@ -89,32 +100,66 @@ def create_biochar_suitability_map(
         bearing=0
     )
     
+    # Check if recommendations are available in prepared data (lowercase column names)
+    has_recommendations = 'recommended_feedstock' in prepared_data.columns and 'recommendation_reason' in prepared_data.columns
+    
     # Create tooltip
     if has_h3:
-        tooltip = {
-            'html': '''
-            <b>Biochar Suitability:</b> {biochar_suitability_score_formatted}<br>
-            <b>Grade:</b> {suitability_grade}<br>
-            <b>Location:</b> {lat_formatted}, {lon_formatted}<br>
-            <b>Points:</b> {point_count}
-            ''',
-            'style': {
-                'backgroundColor': 'white',
-                'color': 'black'
+        if has_recommendations:
+            tooltip = {
+                'html': '''
+                <b>Biochar Suitability:</b> {biochar_suitability_score_formatted}<br>
+                <b>Grade:</b> {suitability_grade}<br>
+                <b>Best Biochar:</b> {recommended_feedstock}<br>
+                <b>Reason:</b> {recommendation_reason}<br>
+                <b>Location:</b> {lat_formatted}, {lon_formatted}<br>
+                <b>Points:</b> {point_count}
+                ''',
+                'style': {
+                    'backgroundColor': 'white',
+                    'color': 'black'
+                }
             }
-        }
+        else:
+            tooltip = {
+                'html': '''
+                <b>Biochar Suitability:</b> {biochar_suitability_score_formatted}<br>
+                <b>Grade:</b> {suitability_grade}<br>
+                <b>Location:</b> {lat_formatted}, {lon_formatted}<br>
+                <b>Points:</b> {point_count}
+                ''',
+                'style': {
+                    'backgroundColor': 'white',
+                    'color': 'black'
+                }
+            }
     else:
-        tooltip = {
-            'html': '''
-            <b>Biochar Suitability:</b> {biochar_suitability_score_formatted}<br>
-            <b>Grade:</b> {suitability_grade}<br>
-            <b>Location:</b> {lat_formatted}, {lon_formatted}
-            ''',
-            'style': {
-                'backgroundColor': 'white',
-                'color': 'black'
+        if has_recommendations:
+            tooltip = {
+                'html': '''
+                <b>Biochar Suitability:</b> {biochar_suitability_score_formatted}<br>
+                <b>Grade:</b> {suitability_grade}<br>
+                <b>Best Biochar:</b> {recommended_feedstock}<br>
+                <b>Reason:</b> {recommendation_reason}<br>
+                <b>Location:</b> {lat_formatted}, {lon_formatted}
+                ''',
+                'style': {
+                    'backgroundColor': 'white',
+                    'color': 'black'
+                }
             }
-        }
+        else:
+            tooltip = {
+                'html': '''
+                <b>Biochar Suitability:</b> {biochar_suitability_score_formatted}<br>
+                <b>Grade:</b> {suitability_grade}<br>
+                <b>Location:</b> {lat_formatted}, {lon_formatted}
+                ''',
+                'style': {
+                    'backgroundColor': 'white',
+                    'color': 'black'
+                }
+            }
     
     # Create deck
     deck = pdk.Deck(
@@ -139,22 +184,35 @@ def create_biochar_suitability_map(
 
 def _prepare_biochar_hexagon_data(df: pd.DataFrame) -> pd.DataFrame:
     """Prepare hexagon data for biochar suitability map."""
+    # Check if recommendations are available
+    has_recommendations = 'Recommended_Feedstock' in df.columns and 'Recommendation_Reason' in df.columns
+    
     # Check if data is already aggregated
     if 'point_count' in df.columns:
-        hexagon_data = df.groupby('h3_index').agg({
+        agg_dict = {
             'biochar_suitability_score': 'first',
             'suitability_grade': 'first',
-            'lat': 'first',
-            'lon': 'first',
+            'lat': 'mean',  # Use mean to match original aggregation (optimization change)
+            'lon': 'mean',  # Use mean to match original aggregation (optimization change)
             'point_count': 'first'
-        }).reset_index()
+        }
+        if has_recommendations:
+            agg_dict['Recommended_Feedstock'] = 'first'
+            agg_dict['Recommendation_Reason'] = 'first'
+        
+        hexagon_data = df.groupby('h3_index').agg(agg_dict).reset_index()
     else:
-        hexagon_data = df.groupby('h3_index').agg({
+        agg_dict = {
             'biochar_suitability_score': 'mean',
             'suitability_grade': lambda x: x.mode()[0] if len(x.mode()) > 0 else '',
-            'lat': 'first',
-            'lon': 'first'
-        }).reset_index()
+            'lat': 'mean',  # Use mean to match original aggregation (optimization change)
+            'lon': 'mean'   # Use mean to match original aggregation (optimization change)
+        }
+        if has_recommendations:
+            agg_dict['Recommended_Feedstock'] = lambda x: x.mode()[0] if len(x.mode()) > 0 else ''
+            agg_dict['Recommendation_Reason'] = 'first'
+        
+        hexagon_data = df.groupby('h3_index').agg(agg_dict).reset_index()
         
         point_counts = df.groupby('h3_index').size().reset_index(name='point_count')
         hexagon_data = hexagon_data.merge(point_counts, on='h3_index')
@@ -166,6 +224,11 @@ def _prepare_biochar_hexagon_data(df: pd.DataFrame) -> pd.DataFrame:
     hexagon_data['biochar_suitability_score_formatted'] = hexagon_data['biochar_suitability_score'].apply(
         lambda x: f"{x/10.0:.2f}" if pd.notna(x) else "N/A"
     )
+    
+    # Format recommendations if available
+    if has_recommendations:
+        hexagon_data['recommended_feedstock'] = hexagon_data['Recommended_Feedstock'].fillna('N/A').astype(str)
+        hexagon_data['recommendation_reason'] = hexagon_data['Recommendation_Reason'].fillna('N/A').astype(str)
     
     # Add color as RGBA array
     def get_color_rgba(score):
@@ -184,7 +247,14 @@ def _prepare_biochar_hexagon_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def _prepare_biochar_point_data(df: pd.DataFrame) -> pd.DataFrame:
     """Prepare point data for biochar suitability map."""
-    point_data = df[['lon', 'lat', 'biochar_suitability_score', 'suitability_grade']].copy()
+    # Check if recommendations are available
+    has_recommendations = 'Recommended_Feedstock' in df.columns and 'Recommendation_Reason' in df.columns
+    
+    cols = ['lon', 'lat', 'biochar_suitability_score', 'suitability_grade']
+    if has_recommendations:
+        cols.extend(['Recommended_Feedstock', 'Recommendation_Reason'])
+    
+    point_data = df[cols].copy()
     
     # Format values for tooltip
     point_data['lat_formatted'] = point_data['lat'].apply(lambda x: f"{x:.2f}")
@@ -193,6 +263,11 @@ def _prepare_biochar_point_data(df: pd.DataFrame) -> pd.DataFrame:
     point_data['biochar_suitability_score_formatted'] = point_data['biochar_suitability_score'].apply(
         lambda x: f"{x/10.0:.2f}" if pd.notna(x) else "N/A"
     )
+    
+    # Format recommendations if available
+    if has_recommendations:
+        point_data['recommended_feedstock'] = point_data['Recommended_Feedstock'].fillna('N/A').astype(str)
+        point_data['recommendation_reason'] = point_data['Recommendation_Reason'].fillna('N/A').astype(str)
     
     # Add color as RGBA array
     def get_color_rgba(score):

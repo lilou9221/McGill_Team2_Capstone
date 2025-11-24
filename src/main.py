@@ -134,8 +134,10 @@ def main() -> int:
     parser.add_argument("--lat", type=float, default=None)
     parser.add_argument("--lon", type=float, default=None)
     parser.add_argument("--radius", type=float, default=100)
-    parser.add_argument("--h3-resolution", type=int, default=7)
+    parser.add_argument("--h3-resolution", type=int, default=None, help="H3 resolution (auto-calculated if not provided)")
     parser.add_argument("--config", type=str, default="configs/config.yaml")
+    parser.add_argument("--skip-maps", action="store_true", help="Skip generating individual property maps (SOC, pH, moisture)")
+    parser.add_argument("--skip-investor", action="store_true", help="Skip generating investor crop area map")
     args = parser.parse_args()
 
     config, project_root, raw_dir, processed_dir = initialize_project(args.config)
@@ -172,7 +174,11 @@ def main() -> int:
         )
         shutil.rmtree(filtered_input_dir, ignore_errors=True)
         if cache_used: print(" Using cached clipped rasters")
-        h3_resolution = args.h3_resolution
+        # Set H3 resolution: default 7 when coordinates provided, or use user-specified value
+        if args.h3_resolution is None:
+            h3_resolution = 7
+        else:
+            h3_resolution = args.h3_resolution
 
     print("Converting GeoTIFFs to DataFrames...")
     tables = convert_all_rasters_to_dataframes(input_dir=tif_dir, band=1, nodata_handling="skip",
@@ -201,10 +207,9 @@ def main() -> int:
     print("="*60)
     scored_df = calculate_biochar_suitability_scores(merged_df)
 
-    # Biochar recommender integration (future feature)
-    # Uncomment and configure when ready to use:
-    # from src.analyzers.biochar_recommender import recommend_biochar
-    # scored_df = recommend_biochar(scored_df)
+    # Biochar recommender integration
+    from src.analyzers.biochar_recommender import recommend_biochar
+    scored_df = recommend_biochar(scored_df)
 
     # Save final CSV for Streamlit
     suitability_csv_path = processed_dir / "suitability_scores.csv"
@@ -220,91 +225,98 @@ def main() -> int:
 
     biochar_map_path = output_dir / "suitability_map.html"
     try:
+        # Load from CSV to ensure consistency with other maps (uses saved data)
         create_biochar_suitability_map(
-            df=scored_df, output_path=biochar_map_path, use_h3=True,
+            df=suitability_csv_path, output_path=biochar_map_path, use_h3=True,
             center_lat=center_lat, center_lon=center_lon, zoom_start=zoom
         )
     except Exception as e:
         print(f"Map error: {e}")
 
-    # Create SOC map
-    soc_map_path = output_dir / "soc_map.html"
-    soc_map_streamlit_path = output_dir / "soc_map_streamlit.html"
-    try:
-        create_soc_map(
-            processed_dir=processed_dir,
-            output_path=soc_map_path,
-            h3_resolution=h3_resolution,
-            use_coords=not area.use_full_state,
-            center_lat=center_lat,
-            center_lon=center_lon,
-            zoom_start=zoom
-        )
-        # Copy for Streamlit
-        shutil.copy2(soc_map_path, soc_map_streamlit_path)
-        print(f"SOC map saved to: {soc_map_path}")
-    except Exception as e:
-        print(f"SOC map error: {e}")
-
-    # Create pH map
-    ph_map_path = output_dir / "ph_map.html"
-    ph_map_streamlit_path = output_dir / "ph_map_streamlit.html"
-    try:
-        create_ph_map(
-            processed_dir=processed_dir,
-            output_path=ph_map_path,
-            h3_resolution=h3_resolution,
-            use_coords=not area.use_full_state,
-            center_lat=center_lat,
-            center_lon=center_lon,
-            zoom_start=zoom
-        )
-        # Copy for Streamlit
-        shutil.copy2(ph_map_path, ph_map_streamlit_path)
-        print(f"pH map saved to: {ph_map_path}")
-    except Exception as e:
-        print(f"pH map error: {e}")
-
-    # Create moisture map
-    moisture_map_path = output_dir / "moisture_map.html"
-    moisture_map_streamlit_path = output_dir / "moisture_map_streamlit.html"
-    try:
-        create_moisture_map(
-            processed_dir=processed_dir,
-            output_path=moisture_map_path,
-            h3_resolution=h3_resolution,
-            use_coords=not area.use_full_state,
-            center_lat=center_lat,
-            center_lon=center_lon,
-            zoom_start=zoom
-        )
-        # Copy for Streamlit
-        shutil.copy2(moisture_map_path, moisture_map_streamlit_path)
-        print(f"Moisture map saved to: {moisture_map_path}")
-    except Exception as e:
-        print(f"Moisture map error: {e}")
-
-    # Investor crop area map (municipality-level)
-    investor_map_path = output_dir / "investor_crop_area_map.html"
-    boundaries_dir = project_root / "data" / "boundaries" / "BR_Municipios_2024"
-    waste_csv_path = project_root / "data" / "crop_data" / "Updated_municipality_crop_production_data.csv"
-    if boundaries_dir.exists() and waste_csv_path.exists():
+    # Create SOC map (optional, can be skipped for faster processing)
+    if not args.skip_maps:
+        soc_map_path = output_dir / "soc_map_streamlit.html"
         try:
-            _, merged_gdf = build_investor_waste_deck_html(
-                boundaries_dir, waste_csv_path, investor_map_path, simplify_tolerance=0.01
+            create_soc_map(
+                processed_dir=processed_dir,
+                output_path=soc_map_path,
+                h3_resolution=h3_resolution,
+                use_coords=not area.use_full_state,
+                center_lat=center_lat,
+                center_lon=center_lon,
+                zoom_start=zoom
             )
-            print(f"Investor crop area map saved to: {investor_map_path}")
-        except Exception as exc:
-            print(f"Could not create investor waste map: {exc}")
+            print(f"SOC map saved to: {soc_map_path}")
+        except Exception as e:
+            print(f"SOC map error: {e}")
     else:
-        print("Skipping investor crop area map (boundary or crop data missing).")
+        print("Skipping SOC map (--skip-maps flag)")
+
+    # Create pH map (optional, can be skipped for faster processing)
+    if not args.skip_maps:
+        ph_map_path = output_dir / "ph_map_streamlit.html"
+        try:
+            create_ph_map(
+                processed_dir=processed_dir,
+                output_path=ph_map_path,
+                h3_resolution=h3_resolution,
+                use_coords=not area.use_full_state,
+                center_lat=center_lat,
+                center_lon=center_lon,
+                zoom_start=zoom
+            )
+            print(f"pH map saved to: {ph_map_path}")
+        except Exception as e:
+            print(f"pH map error: {e}")
+    else:
+        print("Skipping pH map (--skip-maps flag)")
+
+    # Create moisture map (optional, can be skipped for faster processing)
+    if not args.skip_maps:
+        moisture_map_path = output_dir / "moisture_map_streamlit.html"
+        try:
+            create_moisture_map(
+                processed_dir=processed_dir,
+                output_path=moisture_map_path,
+                h3_resolution=h3_resolution,
+                use_coords=not area.use_full_state,
+                center_lat=center_lat,
+                center_lon=center_lon,
+                zoom_start=zoom
+            )
+            print(f"Moisture map saved to: {moisture_map_path}")
+        except Exception as e:
+            print(f"Moisture map error: {e}")
+    else:
+        print("Skipping moisture map (--skip-maps flag)")
+
+    # Investor crop area map (municipality-level, optional)
+    investor_map_path = output_dir / "investor_crop_area_map.html"
+    if not args.skip_investor:
+        boundaries_dir = project_root / "data" / "boundaries" / "BR_Municipios_2024"
+        waste_csv_path = project_root / "data" / "crop_data" / "Updated_municipality_crop_production_data.csv"
+        if boundaries_dir.exists() and waste_csv_path.exists():
+            try:
+                _, merged_gdf = build_investor_waste_deck_html(
+                    boundaries_dir, waste_csv_path, investor_map_path, simplify_tolerance=0.01
+                )
+                print(f"Investor crop area map saved to: {investor_map_path}")
+            except Exception as exc:
+                print(f"Could not create investor waste map: {exc}")
+        else:
+            print("Skipping investor crop area map (boundary or crop data missing).")
+    else:
+        print("Skipping investor crop area map (--skip-investor flag)")
 
     print(f"\nAll done! Results in: {processed_dir}")
     print(f"Maps in: {output_dir}")
 
     if config.get("visualization", {}).get("auto_open_html", True):
         print("Opening maps in browser...")
+        import time
         open_html_in_browser(biochar_map_path)
+        time.sleep(0.5)  # Small delay to prevent duplicate opens on Windows
+        # Open generated maps (all maps are generated with Streamlit-compatible names)
         for extra_map in [
             output_dir / "soc_map_streamlit.html",
             output_dir / "ph_map_streamlit.html",
@@ -313,6 +325,7 @@ def main() -> int:
         ]:
             if extra_map.exists():
                 open_html_in_browser(extra_map)
+                time.sleep(0.5)  # Small delay between each map
 
     return 0
 

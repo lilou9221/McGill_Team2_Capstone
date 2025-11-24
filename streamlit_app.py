@@ -463,17 +463,69 @@ if st.session_state.get("analysis_results"):
             """, unsafe_allow_html=True)
 
         with rec_tab:
-            st.subheader("Top 10 Recommended Locations")
-            feed_col = next((c for c in df.columns if "feedstock" in c.lower()), None)
-            reason_col = next((c for c in df.columns if "reason" in c.lower()), None)
-            if feed_col and reason_col:
-                cols = ["h3_index", "suitability_score", "mean_soc", "mean_ph", "mean_moisture", feed_col, reason_col]
-                cols = [c for c in cols if c in df.columns]
-                top10 = df[cols].sort_values("suitability_score", ascending=False).head(10).round(3)
-                top10 = top10.rename(columns={feed_col: "Recommended Feedstock", reason_col: "Rationale"})
-                st.dataframe(top10.style.format({"suitability_score": "{:.2f}"}), use_container_width=True, hide_index=True)
+            st.subheader("Biochar Feedstock Recommendations")
+            
+            # Check if recommendation columns exist
+            if "Recommended_Feedstock" in df.columns and "Recommendation_Reason" in df.columns:
+                # Filter out rows without recommendations
+                rec_df = df[df["Recommended_Feedstock"].notna() & (df["Recommended_Feedstock"] != "No recommendation")].copy()
+                
+                if len(rec_df) > 0:
+                    # Show summary statistics
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        unique_feedstocks = rec_df["Recommended_Feedstock"].nunique()
+                        st.metric("Unique Feedstocks Recommended", unique_feedstocks)
+                    with col2:
+                        total_locations = len(rec_df)
+                        st.metric("Locations with Recommendations", f"{total_locations:,}")
+                    with col3:
+                        if "Data_Quality" in rec_df.columns:
+                            high_quality = (rec_df["Data_Quality"] == "high").sum()
+                            st.metric("High Quality Data", f"{high_quality:,} ({high_quality/total_locations*100:.1f}%)")
+                    
+                    # Show top 10 by suitability score
+                    st.markdown("### Top 10 Recommended Locations (by Suitability Score)")
+                    display_cols = ["suitability_score", "suitability_grade", "Recommended_Feedstock", "Recommendation_Reason"]
+                    if "Data_Source" in rec_df.columns and "Data_Quality" in rec_df.columns:
+                        display_cols.extend(["Data_Source", "Data_Quality"])
+                    if "lat" in rec_df.columns and "lon" in rec_df.columns:
+                        display_cols.extend(["lat", "lon"])
+                    
+                    display_cols = [c for c in display_cols if c in rec_df.columns]
+                    top10 = rec_df[display_cols].sort_values("suitability_score", ascending=False).head(10)
+                    
+                    # Format the dataframe for display
+                    top10_display = top10.copy()
+                    if "suitability_score" in top10_display.columns:
+                        top10_display["suitability_score"] = top10_display["suitability_score"].round(2)
+                    if "lat" in top10_display.columns and "lon" in top10_display.columns:
+                        top10_display["lat"] = top10_display["lat"].round(4)
+                        top10_display["lon"] = top10_display["lon"].round(4)
+                    
+                    # Rename columns for better display
+                    rename_map = {
+                        "suitability_score": "Suitability Score",
+                        "suitability_grade": "Grade",
+                        "Recommended_Feedstock": "Recommended Feedstock",
+                        "Recommendation_Reason": "Reason",
+                        "Data_Source": "Data Source",
+                        "Data_Quality": "Data Quality",
+                        "lat": "Latitude",
+                        "lon": "Longitude"
+                    }
+                    top10_display = top10_display.rename(columns=rename_map)
+                    
+                    st.dataframe(top10_display, use_container_width=True, hide_index=True)
+                    
+                    # Show feedstock distribution
+                    st.markdown("### Feedstock Distribution")
+                    feedstock_counts = rec_df["Recommended_Feedstock"].value_counts()
+                    st.bar_chart(feedstock_counts)
+                else:
+                    st.info("No biochar recommendations available. All locations show 'No recommendation'.")
             else:
-                st.info("Feedstock recommendations not available in this run.")
+                st.info("Biochar feedstock recommendations not available in this run. Please run the analysis with recommendations enabled.")
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.download_button(

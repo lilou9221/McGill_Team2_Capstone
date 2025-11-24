@@ -258,7 +258,7 @@ def create_municipality_waste_deck(
     view_state = pdk.ViewState(
         latitude=center.y,
         longitude=center.x,
-        zoom=4.0,
+        zoom=3.0,
         min_zoom=3,
         max_zoom=12,
         pitch=0,
