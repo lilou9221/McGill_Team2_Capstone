@@ -44,6 +44,10 @@ logs/*.log
 run.log
 .progress.json
 
+# Generated/Processed Data (should not be in repository)
+data/processed/merged_soil_data.csv
+data/processed/suitability_scores.csv
+
 # Processed Data Cache
 data/processed/cache/
 !data/processed/cache/.gitkeep
