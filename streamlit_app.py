@@ -78,7 +78,13 @@ REQUIRED_DATA_FILES = [
 @st.cache_data(ttl=3600)  # Cache for 1 hour - files don't change often
 def check_required_files_exist():
     """Check if all required data files exist. Cached to avoid repeated file system checks."""
-    missing = [path for path in REQUIRED_DATA_FILES if not path.exists()]
+    missing = []
+    for path in REQUIRED_DATA_FILES:
+        if not path.exists():
+            missing.append(path)
+        elif path.exists() and path.stat().st_size == 0:
+            # Empty files are considered missing
+            missing.append(path)
     return len(missing) == 0, missing
 
 
@@ -105,22 +111,70 @@ def ensure_required_data():
         st.error("Download script missing. Please run `scripts/download_assets.py` manually.")
         st.stop()
 
+    result = None
     try:
-        subprocess.check_call([sys.executable, str(DOWNLOAD_SCRIPT)], cwd=str(PROJECT_ROOT))
-        # Clear the download message after successful download
+        # Capture stdout and stderr to see what's happening
+        print(f"[DEBUG] Running download script: {DOWNLOAD_SCRIPT}", flush=True)
+        print(f"[DEBUG] Working directory: {PROJECT_ROOT}", flush=True)
+        print(f"[DEBUG] Python executable: {sys.executable}", flush=True)
+        
+        result = subprocess.run(
+            [sys.executable, str(DOWNLOAD_SCRIPT)],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 minute timeout
+            env=os.environ.copy()  # Pass environment variables
+        )
+        
+        # Show output for debugging (print goes to Streamlit logs)
+        if result.stdout:
+            print("[DEBUG] Download script STDOUT:", result.stdout, flush=True)
+        if result.stderr:
+            print("[DEBUG] Download script STDERR:", result.stderr, file=sys.stderr, flush=True)
+        
+        if result.returncode != 0:
+            status_placeholder.empty()
+            st.error("Automatic data download failed. See details below.")
+            st.code(f"Exit code: {result.returncode}\n\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}")
+            st.stop()
+    except subprocess.TimeoutExpired as e:
         status_placeholder.empty()
-        st.session_state["data_downloaded"] = True
-    except subprocess.CalledProcessError as exc:
-        status_placeholder.empty()
-        st.error("Automatic data download failed. Please run `scripts/download_assets.py` locally.")
-        st.code(str(exc))
+        st.error("Download timed out after 10 minutes. Please try again or run `scripts/download_assets.py` manually.")
+        st.code(f"Timeout error: {e}")
         st.stop()
-
+    except Exception as exc:
+        status_placeholder.empty()
+        st.error(f"Automatic data download failed: {exc}")
+        st.code(traceback.format_exc())
+        st.stop()
+    
+    # Clear cache before checking files (to ensure fresh check after download)
+    try:
+        check_required_files_exist.clear()
+    except Exception:
+        pass  # Cache clear might fail if not initialized, that's OK
+    
+    # Small delay to ensure filesystem sync
+    import time
+    time.sleep(1)
+    
+    # Clear the download message
+    status_placeholder.empty()
+    
+    # Verify files actually exist after download
     all_exist, remaining_missing = check_required_files_exist()
     if not all_exist:
         st.error("Some data files are still missing after download. Please retry manually.")
         st.code("\n".join(str(p) for p in remaining_missing))
+        # Show download script output for debugging
+        if result and result.stdout:
+            st.code(f"Download script STDOUT:\n{result.stdout}")
+        if result and result.stderr:
+            st.code(f"Download script STDERR:\n{result.stderr}")
         st.stop()
+    
+    st.session_state["data_downloaded"] = True
 
 
 ensure_required_data()

@@ -5,7 +5,6 @@ Contains all code for analyzing soil data and calculating suitability:
 - Biochar suitability scoring
 - Soil quality assessment
 - Biochar recommendations
-- Threshold management
 """
 
 from src.analyzers.biochar_suitability import calculate_biochar_suitability_scores

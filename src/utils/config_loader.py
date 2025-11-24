@@ -75,8 +75,8 @@ def _load_config_from_env() -> Dict[str, Any]:
 
 def _get_default_config(project_root: Path) -> Dict[str, Any]:
     """
-    Get default configuration that works with data files from Git LFS.
-    No sensitive information required - all data is already in the repository.
+    Get default configuration that works with data files from Google Drive.
+    No sensitive information required - all data is downloaded from Google Drive on demand.
     
     Parameters
     ----------
@@ -115,7 +115,7 @@ def _get_default_config(project_root: Path) -> Dict[str, Any]:
             "console": True
         },
         # GEE and Drive settings are optional - only needed for exporting/downloading new data
-        # Since data files are in Git LFS, these are not required
+        # Data files are downloaded from Google Drive automatically, so these are not required
         "gee": {},
         "drive": {}
     }
@@ -217,9 +217,9 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
                 config = yaml.safe_load(f)
             config_source = str(example_path)
         else:
-            # Fallback 4: Use defaults (works with data files from Git LFS)
+            # Fallback 4: Use defaults (works with data files from Google Drive)
             config = _get_default_config(project_root)
-            config_source = "defaults (works with data files from Git LFS)"
+            config_source = "defaults (works with data files from Google Drive)"
     
     # Override sensitive values from environment variables (even if config file exists)
     env_config = _load_config_from_env()

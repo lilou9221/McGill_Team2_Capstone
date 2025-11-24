@@ -167,10 +167,16 @@ def _copy_required_assets(source_root: Path, force: bool) -> tuple[list[Path], l
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
             shutil.copy2(src, dest)
-            print(f"[OK] Copied {rel_target} ({src.stat().st_size / (1024*1024):.1f} MB)")
+            # Verify the copy was successful
+            if not dest.exists():
+                raise FileNotFoundError(f"File was not created at {dest}")
+            file_size = dest.stat().st_size
+            if file_size == 0:
+                raise ValueError(f"Copied file is empty: {dest}")
+            print(f"[OK] Copied {rel_target} ({file_size / (1024*1024):.1f} MB)", flush=True)
             copied_files.append(rel_target)
         except Exception as e:
-            print(f"[ERROR] Failed to copy {rel_target}: {e}", file=sys.stderr)
+            print(f"[ERROR] Failed to copy {rel_target}: {e}", file=sys.stderr, flush=True)
             missing_sources.append(rel_target)
 
     return copied_files, missing_sources
@@ -178,40 +184,62 @@ def _copy_required_assets(source_root: Path, force: bool) -> tuple[list[Path], l
 
 def download_assets(force: bool = False) -> int:
     """Download assets if any required file is missing."""
+    print(f"[INFO] PROJECT_ROOT: {PROJECT_ROOT}", flush=True)
+    print(f"[INFO] Checking for existing files...", flush=True)
+    
     existing = [
         PROJECT_ROOT / file_spec["target"]
         for file_spec in REQUIRED_FILES
         if (PROJECT_ROOT / file_spec["target"]).exists()
     ]
+    print(f"[INFO] Found {len(existing)}/{len(REQUIRED_FILES)} existing files", flush=True)
+    
     if len(existing) == len(REQUIRED_FILES) and not force:
-        print("All required data files are already present. Nothing to do.")
+        print("All required data files are already present. Nothing to do.", flush=True)
         return 0
 
-    print(f"Downloading assets from {GOOGLE_DRIVE_URL} ...")
-    print(f"Looking for {len(REQUIRED_FILES)} required files...")
+    print(f"Downloading assets from {GOOGLE_DRIVE_URL} ...", flush=True)
+    print(f"Looking for {len(REQUIRED_FILES)} required files...", flush=True)
     
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
+            print(f"[INFO] Using temp directory: {tmp_dir}", flush=True)
             drive_root = _download_drive_folder(Path(tmp_dir))
+            print(f"[INFO] Drive folder downloaded to: {drive_root}", flush=True)
             copied, missing = _copy_required_assets(drive_root, force=force)
             
+            # Verify files were actually copied
+            print(f"[INFO] Verification: Copied {len(copied)}, Missing {len(missing)}", flush=True)
+            verified_missing = []
+            for file_spec in REQUIRED_FILES:
+                dest = PROJECT_ROOT / file_spec["target"]
+                if not dest.exists():
+                    verified_missing.append(dest)
+                    print(f"[ERROR] File not found after copy: {dest}", file=sys.stderr, flush=True)
+            
+            if verified_missing:
+                print(f"\n[ERROR] {len(verified_missing)} files are still missing after copy:", file=sys.stderr, flush=True)
+                for m in verified_missing:
+                    print(f"  - {m}", file=sys.stderr, flush=True)
+                return 1
+            
             if missing:
-                print(f"\n[ERROR] {len(missing)} files are still missing:", file=sys.stderr)
+                print(f"\n[ERROR] {len(missing)} files could not be found in Drive:", file=sys.stderr, flush=True)
                 for m in missing:
-                    print(f"  - {m}", file=sys.stderr)
+                    print(f"  - {m}", file=sys.stderr, flush=True)
                 return 1
             
             if copied:
-                print(f"\n[SUCCESS] Downloaded {len(copied)} files successfully.")
+                print(f"\n[SUCCESS] Downloaded {len(copied)} files successfully.", flush=True)
             else:
-                print("\n[INFO] No new files downloaded (all already exist).")
+                print("\n[INFO] No new files downloaded (all already exist).", flush=True)
     except Exception as e:
-        print(f"\n[ERROR] Download failed: {e}", file=sys.stderr)
+        print(f"\n[ERROR] Download failed: {e}", file=sys.stderr, flush=True)
         import traceback
         traceback.print_exc(file=sys.stderr)
         return 1
 
-    print("Data download complete.")
+    print("Data download complete.", flush=True)
     return 0
 
 
