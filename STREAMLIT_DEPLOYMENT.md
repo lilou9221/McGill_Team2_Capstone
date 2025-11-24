@@ -1,44 +1,51 @@
 # Streamlit Cloud Deployment Notes
 
-## Git LFS Requirements
+## External data source
 
-This repository uses Git LFS for large files including:
-- Municipality boundaries (`data/boundaries/BR_Municipios_2024/*.shp`, `*.dbf`, `*.shx`, etc.) - Extracted shapefile files
-- GeoTIFF files (`data/raw/*.tif`)
-- Other large data files
+All heavy datasets (GeoTIFFs, boundary shapefiles, crop production CSV) are now hosted in a shared Google Drive folder:
 
-**Important**: Streamlit Cloud requires Git LFS to be available during deployment to download these files.
+- **Folder name:** `McGill_Team2_Capstone_Residual_Carbon`
+- **Folder URL:** https://drive.google.com/drive/u/1/folders/1FvG4FM__Eam2pXggHdo5piV7gg2bljjt
 
-If you encounter errors like:
+Keeping data in Drive removes the Git LFS bandwidth/storage bottleneck and allows Streamlit Cloud to pull the assets on demand.
+
+## Download script
+
+The repository ships with `scripts/download_assets.py`, which uses `gdown` to pull the Drive folder and copy the required files into the local `data/` directory. The script runs automatically from the Streamlit app when files are missing, but you can trigger it manually:
+
+```bash
+pip install -r requirements.txt  # ensures gdown is available
+python scripts/download_assets.py
 ```
-error: external filter 'git-lfs filter-process' failed
-fatal: data/boundaries/BR_Municipios_2024.zip: smudge filter lfs failed
+
+Use `python scripts/download_assets.py --force` to re-download and overwrite existing files.
+
+## Required files pulled from Drive
+
+```
+data/boundaries/BR_Municipios_2024/BR_Municipios_2024.{shp, dbf, shx, prj, cpg}
+data/crop_data/Updated_municipality_crop_production_data.csv
+data/raw/SOC_res_250_b0.tif
+data/raw/SOC_res_250_b10.tif
+data/raw/soil_moisture_res_250_sm_surface.tif
+data/raw/soil_pH_res_250_b0.tif
+data/raw/soil_pH_res_250_b10.tif
+data/raw/soil_temp_res_250_soil_temp_layer1.tif
 ```
 
-This indicates that Git LFS is not installed or configured on Streamlit Cloud.
+The Drive folder mirrors the repository layout (`data/...`), so the script can copy files directly into place.
 
-**Note**: The zip file has been removed from the repository to reduce LFS bandwidth usage. The app uses the extracted shapefile directory (`data/boundaries/BR_Municipios_2024/`) directly.
+## Streamlit Cloud deployment workflow
 
-## Solution
+1. **Connect the repo:** `https://github.com/lilou9221/mcgill_team2_capstone`.
+2. **Set credentials/environment variables** (if any) in Streamlit Cloud.
+3. **Deploy:** the app will call `scripts/download_assets.py` automatically on first run. Allow a few minutes for the initial download (~400 MB).
+4. **Subsequent restarts** reuse the cached data directory, so downloads run only when files are missing.
 
-Streamlit Cloud should automatically handle Git LFS, but if it doesn't:
+## Local development workflow
 
-1. Ensure all LFS files are properly pushed:
-   ```bash
-   git lfs push --all origin
-   ```
+1. Clone the repo.
+2. Run `python scripts/download_assets.py` once to fetch the datasets.
+3. Launch the Streamlit app as usual.
 
-2. Verify LFS files are tracked:
-   ```bash
-   git lfs ls-files
-   ```
-
-3. If the issue persists, contact Streamlit support or check Streamlit Cloud documentation for Git LFS configuration.
-
-## Files Tracked by LFS
-
-- `data/boundaries/BR_Municipios_2024/*.shp`, `*.dbf`, `*.shx`, `*.prj`, `*.cpg` - Required for investor map (extracted shapefile files)
-- `data/raw/*.tif` - GeoTIFF raster files
-- Large CSV files (except `data/pyrolysis/pyrolysis_data.csv` and `pyrolysis_data_fallback.csv` which are small)
-
-
+> If the download fails, verify that the Drive folder link is public (“Anyone with the link can view”) and that `gdown` is installed.

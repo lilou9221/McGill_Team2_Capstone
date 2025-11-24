@@ -36,6 +36,7 @@ pyyaml>=6.0
 
 # Utilities
 python-dotenv>=1.0.0
+gdown>=5.0.0
 
 # Streamlit UI
 streamlit>=1.38.0

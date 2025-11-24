@@ -58,6 +58,54 @@ def get_config():
 
 config = get_config()
 
+DOWNLOAD_SCRIPT = PROJECT_ROOT / "scripts" / "download_assets.py"
+REQUIRED_DATA_FILES = [
+    PROJECT_ROOT / "data" / "boundaries" / "BR_Municipios_2024" / "BR_Municipios_2024.shp",
+    PROJECT_ROOT / "data" / "boundaries" / "BR_Municipios_2024" / "BR_Municipios_2024.dbf",
+    PROJECT_ROOT / "data" / "boundaries" / "BR_Municipios_2024" / "BR_Municipios_2024.shx",
+    PROJECT_ROOT / "data" / "boundaries" / "BR_Municipios_2024" / "BR_Municipios_2024.prj",
+    PROJECT_ROOT / "data" / "boundaries" / "BR_Municipios_2024" / "BR_Municipios_2024.cpg",
+    PROJECT_ROOT / "data" / "crop_data" / "Updated_municipality_crop_production_data.csv",
+    PROJECT_ROOT / "data" / "raw" / "SOC_res_250_b0.tif",
+    PROJECT_ROOT / "data" / "raw" / "SOC_res_250_b10.tif",
+    PROJECT_ROOT / "data" / "raw" / "soil_moisture_res_250_sm_surface.tif",
+    PROJECT_ROOT / "data" / "raw" / "soil_pH_res_250_b0.tif",
+    PROJECT_ROOT / "data" / "raw" / "soil_pH_res_250_b10.tif",
+    PROJECT_ROOT / "data" / "raw" / "soil_temp_res_250_soil_temp_layer1.tif",
+]
+
+
+def ensure_required_data():
+    """Download data assets from Google Drive if they are missing locally."""
+    missing = [path for path in REQUIRED_DATA_FILES if not path.exists()]
+    if not missing:
+        return
+
+    st.info(
+        "Downloading required geo datasets from Google Drive (first run only). "
+        "This may take a few minutes."
+    )
+
+    if not DOWNLOAD_SCRIPT.exists():
+        st.error("Download script missing. Please run `scripts/download_assets.py` manually.")
+        st.stop()
+
+    try:
+        subprocess.check_call([sys.executable, str(DOWNLOAD_SCRIPT)], cwd=str(PROJECT_ROOT))
+    except subprocess.CalledProcessError as exc:
+        st.error("Automatic data download failed. Please run `scripts/download_assets.py` locally.")
+        st.code(str(exc))
+        st.stop()
+
+    remaining_missing = [path for path in REQUIRED_DATA_FILES if not path.exists()]
+    if remaining_missing:
+        st.error("Some data files are still missing after download. Please retry manually.")
+        st.code("\n".join(str(p) for p in remaining_missing))
+        st.stop()
+
+
+ensure_required_data()
+
 # ============================================================
 # GLOBAL STYLING (updated for white background + black text)
 # ============================================================
