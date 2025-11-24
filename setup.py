@@ -28,7 +28,7 @@ setup(
     long_description_content_type="text/markdown",
     author="Your Name",
     author_email="your.email@example.com",
-    url="https://github.com/yourusername/Residual_Carbon",
+    url="https://github.com/lilou9221/McGill_Team2_Capstone",
     packages=find_packages(),
     python_requires=">=3.9",
     install_requires=requirements,
