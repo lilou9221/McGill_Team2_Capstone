@@ -90,20 +90,40 @@ def _download_drive_folder(tmp_dir: Path) -> Path:
     # Check for subdirectories first
     subdirs = [p for p in output_dir.iterdir() if p.is_dir()]
     if len(subdirs) == 1:
-        return subdirs[0]
+        folder_root = subdirs[0]
+        print(f"[INFO] Files downloaded to subdirectory: {folder_root}")
+        return folder_root
+    
     # If no subdir, files might be directly in output_dir
     files = [p for p in output_dir.iterdir() if p.is_file()]
     if files:
+        print(f"[INFO] Files downloaded directly to: {output_dir} ({len(files)} files found)")
+        return output_dir
+    
+    # Last resort: search recursively for any files
+    all_files = list(output_dir.rglob("*"))
+    files_only = [f for f in all_files if f.is_file()]
+    if files_only:
+        print(f"[INFO] Found {len(files_only)} files recursively in {output_dir}")
         return output_dir
     
     raise FileNotFoundError(f"No files found in downloaded folder: {output_dir}")
 
 
 def _locate_source_file(source_root: Path, filename: str) -> Path | None:
-    """Find a file inside the downloaded Drive folder by name."""
+    """Find a file inside the downloaded Drive folder by name (case-insensitive search)."""
+    # Try exact match first
     matches = list(source_root.rglob(filename))
     if not matches:
+        # Try case-insensitive match
+        filename_lower = filename.lower()
+        for file_path in source_root.rglob("*"):
+            if file_path.is_file() and file_path.name.lower() == filename_lower:
+                matches.append(file_path)
+    
+    if not matches:
         return None
+    
     # Prefer the shallowest match (in case of duplicates)
     return sorted(matches, key=lambda p: len(p.parts))[0]
 
@@ -118,7 +138,15 @@ def _copy_required_assets(source_root: Path, force: bool) -> tuple[list[Path], l
     copied_files = []
     
     print(f"[INFO] Searching for files in: {source_root}")
-    print(f"[INFO] Found {len(list(source_root.rglob('*')))} items in downloaded folder")
+    all_items = list(source_root.rglob("*"))
+    files_only = [f for f in all_items if f.is_file()]
+    print(f"[INFO] Found {len(files_only)} files in downloaded folder")
+    
+    # List all available files for debugging
+    if files_only:
+        print(f"[DEBUG] Available files: {', '.join(f.name for f in files_only[:10])}")
+        if len(files_only) > 10:
+            print(f"[DEBUG] ... and {len(files_only) - 10} more files")
     
     for file_spec in REQUIRED_FILES:
         rel_target = Path(file_spec["target"])
@@ -126,18 +154,20 @@ def _copy_required_assets(source_root: Path, force: bool) -> tuple[list[Path], l
         src = _locate_source_file(source_root, file_spec["filename"])
 
         if src is None:
-            print(f"[WARN] File not found in Drive: {file_spec['filename']}", file=sys.stderr)
+            print(f"[ERROR] File not found in Drive: {file_spec['filename']}", file=sys.stderr)
+            print(f"[DEBUG] Searched in: {source_root}", file=sys.stderr)
             missing_sources.append(rel_target)
             continue
 
         if dest.exists() and not force:
             print(f"[SKIP] Already exists: {rel_target}")
+            copied_files.append(rel_target)  # Count as success even if skipped
             continue
 
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
             shutil.copy2(src, dest)
-            print(f"[OK] Copied {rel_target}")
+            print(f"[OK] Copied {rel_target} ({src.stat().st_size / (1024*1024):.1f} MB)")
             copied_files.append(rel_target)
         except Exception as e:
             print(f"[ERROR] Failed to copy {rel_target}: {e}", file=sys.stderr)
