@@ -791,8 +791,8 @@ with investor_tab:
                 with c2: st.metric("Total Production", f"{gdf['total_crop_production_ton'].sum():,.0f} t")
                 with c3: st.metric("Total Residue", f"{gdf['total_crop_residue_ton'].sum():,.0f} t")
 
-else:
-    # Show initial message (only checked once per session, cached in session state)
+# Show initial message if no results exist (only checked once per session)
+if not csv_path or df is None or not map_paths:
     if not st.session_state.get("initial_message_shown", False):
         potential_csv = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
         if potential_csv.exists():
