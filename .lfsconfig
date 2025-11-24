@@ -1,0 +1,6 @@
+[lfs]
+	# Skip downloading LFS files during clone to avoid budget issues
+	# Streamlit Cloud will use extracted files instead
+	fetchinclude = 
+	fetchexclude = data/boundaries/BR_Municipios_2024.zip
+
