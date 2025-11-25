@@ -1,4 +1,9 @@
-"""PyDeck map builder for municipality-level crop area (investor view)."""
+"""
+PyDeck map builder for municipality-level crop area visualization (Investor view).
+
+This module creates interactive choropleth maps showing crop area, production,
+and residue availability at the municipality level across Brazil.
+"""
 from __future__ import annotations
 
 import json
@@ -16,16 +21,21 @@ try:
     HAS_STREAMLIT = True
 except ImportError:
     HAS_STREAMLIT = False
-    # Create a dummy cache decorator if streamlit is not available
     def _dummy_cache(func):
         return func
     st = type('obj', (object,), {'cache_data': lambda *args, **kwargs: lambda f: f})()
 
 
 def _find_boundary_file(boundary_dir: Path) -> Path:
-    """Return the first boundary file we can read (GPKG or SHP).
+    """
+    Find the first readable boundary file (GPKG or SHP) in directory.
     
-    In flat structure, boundary_dir is data/ and shapefile components are directly in it.
+    Args:
+        boundary_dir: Directory containing boundary files.
+    Returns:
+        Path to the boundary file.
+    Raises:
+        FileNotFoundError: If no boundary file found.
     """
     for pattern in ("*.gpkg", "*.shp"):
         matches = sorted(boundary_dir.glob(pattern))
@@ -37,6 +47,14 @@ def _find_boundary_file(boundary_dir: Path) -> Path:
 
 
 def _normalize_name(value: str) -> str:
+    """
+    Normalize municipality name for matching (lowercase, ASCII, no special chars).
+    
+    Args:
+        value: Raw municipality name.
+    Returns:
+        Normalized string for comparison.
+    """
     if value is None:
         return ""
     value = unicodedata.normalize("NFKD", str(value))
@@ -51,7 +69,14 @@ def _normalize_name(value: str) -> str:
 
 
 def load_municipality_boundaries(boundary_dir: Path) -> gpd.GeoDataFrame:
-    """Load municipality boundaries with caching if Streamlit is available."""
+    """
+    Load municipality boundary shapefile and normalize for merging.
+    
+    Args:
+        boundary_dir: Directory containing shapefile.
+    Returns:
+        GeoDataFrame with boundaries in EPSG:4326 and normalized names.
+    """
     def _load_impl(boundary_dir: Path) -> gpd.GeoDataFrame:
         boundary_file = _find_boundary_file(boundary_dir)
         gdf = gpd.read_file(boundary_file)
@@ -70,6 +95,7 @@ def load_municipality_boundaries(boundary_dir: Path) -> gpd.GeoDataFrame:
 
 
 def _infer_numeric_columns(df: pd.DataFrame) -> None:
+    """Convert columns to numeric where possible (in-place)."""
     for col in df.columns:
         try:
             df[col] = pd.to_numeric(df[col])
@@ -78,7 +104,14 @@ def _infer_numeric_columns(df: pd.DataFrame) -> None:
 
 
 def load_crop_area_dataframe(csv_path: Path) -> pd.DataFrame:
-    """Load crop area dataframe with caching if Streamlit is available."""
+    """
+    Load and aggregate crop production data by municipality.
+    
+    Args:
+        csv_path: Path to crop production CSV file.
+    Returns:
+        DataFrame with aggregated totals per municipality.
+    """
     def _load_impl(csv_path: Path) -> pd.DataFrame:
         df = pd.read_csv(csv_path)
         _infer_numeric_columns(df)
@@ -128,7 +161,15 @@ def load_crop_area_dataframe(csv_path: Path) -> pd.DataFrame:
 
 
 def _simplify_geometries(gdf: gpd.GeoDataFrame, tolerance: float = 0.01) -> gpd.GeoDataFrame:
-    """Simplify geometries to lighten the map without breaking topology."""
+    """
+    Simplify polygon geometries to reduce file size while preserving topology.
+    
+    Args:
+        gdf: GeoDataFrame with polygon geometries.
+        tolerance: Simplification tolerance in degrees (0.01 ~ 1km).
+    Returns:
+        GeoDataFrame with simplified geometries.
+    """
     if tolerance <= 0:
         return gdf
     try:
@@ -146,6 +187,16 @@ def _simplify_geometries(gdf: gpd.GeoDataFrame, tolerance: float = 0.01) -> gpd.
 def prepare_investor_crop_area_geodata(
     boundary_dir: Path, waste_csv_path: Path, simplify_tolerance: float = 0.01
 ) -> gpd.GeoDataFrame:
+    """
+    Merge municipality boundaries with crop production data.
+    
+    Args:
+        boundary_dir: Directory containing shapefile.
+        waste_csv_path: Path to crop production CSV.
+        simplify_tolerance: Geometry simplification tolerance.
+    Returns:
+        GeoDataFrame with merged boundaries and crop data.
+    """
     boundaries = load_municipality_boundaries(boundary_dir)
     boundaries = _simplify_geometries(boundaries, simplify_tolerance)
     crop_df = load_crop_area_dataframe(waste_csv_path)
@@ -171,6 +222,15 @@ def prepare_investor_crop_area_geodata(
 
 
 def _value_to_color(value: float, vmax: float) -> Tuple[int, int, int, int]:
+    """
+    Convert a value to RGBA color based on ratio to max value.
+    
+    Args:
+        value: Current value.
+        vmax: Maximum value in dataset.
+    Returns:
+        RGBA tuple (red, green, blue, alpha).
+    """
     if vmax <= 0:
         return (200, 200, 200, 120)
     ratio = min(max(value / vmax, 0.0), 1.0)
@@ -185,14 +245,13 @@ def create_municipality_waste_deck(
     data_type: str = "area",
 ) -> pdk.Deck:
     """
-    Create municipality waste deck with specified data type.
+    Create interactive PyDeck map for municipality crop data.
     
     Args:
-        merged_gdf: GeoDataFrame with municipality boundaries and crop data
-        data_type: One of 'area', 'production', or 'residue'
-    
+        merged_gdf: GeoDataFrame with boundaries and crop data.
+        data_type: Display type - 'area', 'production', or 'residue'.
     Returns:
-        pydeck Deck object
+        pdk.Deck: Configured PyDeck visualization.
     """
     # Validate data type
     if data_type not in ["area", "production", "residue"]:

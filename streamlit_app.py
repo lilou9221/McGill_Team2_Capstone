@@ -1,6 +1,11 @@
 # ============================================================
-# STREAMLIT APP – FINAL POLISHED & LIGHTNING-FAST VERSION + YOUR REQUEST
+# BIOCHAR SUITABILITY MAPPER - Streamlit Web Application
 # ============================================================
+# Main entry point for the Biochar Suitability Mapper tool.
+# Provides interactive soil analysis and crop residue visualization
+# for sustainable biochar application in Mato Grosso, Brazil.
+# ============================================================
+
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -64,8 +69,13 @@ REQUIRED_FILES = {
     "soil_temp_res_250_soil_temp_layer1.tif": 39979898,
 }
 
-def check_data_files():
-    """Check if required data files exist."""
+def check_data_files() -> bool:
+    """
+    Check if all required data files exist in the data directory.
+    
+    Returns:
+        bool: True if all files exist, False otherwise.
+    """
     try:
         data_dir = PROJECT_ROOT / "data"
         for filename in REQUIRED_FILES:
@@ -76,8 +86,14 @@ def check_data_files():
         return False
 
 @st.cache_resource(show_spinner=False)
-def download_r2_files():
-    """Download large files from Cloudflare R2 (files too big for GitHub)."""
+def download_r2_files() -> tuple[list[str], list[str]]:
+    """
+    Download large files from Cloudflare R2 that are too big for GitHub (>50MB).
+    Cached to prevent re-downloading on page reloads.
+    
+    Returns:
+        tuple: (downloaded_files, error_messages)
+    """
     data_dir = PROJECT_ROOT / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     
@@ -124,7 +140,13 @@ if not check_data_files():
             st.error(f"Failed to download: {errors}")
 
 @st.cache_data
-def get_config():
+def get_config() -> dict:
+    """
+    Load and cache application configuration with sensible defaults.
+    
+    Returns:
+        dict: Configuration dictionary with data paths and processing settings.
+    """
     try:
         config = load_config()
         defaults = {
@@ -144,11 +166,17 @@ def get_config():
 
 config = get_config()
 
-# Legacy compatibility
+# Legacy compatibility - list of essential data file paths
 REQUIRED_DATA_FILES = [PROJECT_ROOT / "data" / f for f in list(REQUIRED_FILES.keys())[:6]]
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def check_required_files_exist():
+def check_required_files_exist() -> tuple[bool, list[Path]]:
+    """
+    Check if essential data files exist and are non-empty.
+    
+    Returns:
+        tuple: (all_exist: bool, missing_files: list[Path])
+    """
     missing = []
     for path in REQUIRED_DATA_FILES:
         if not path.exists() or (path.exists() and path.stat().st_size == 0):
@@ -284,15 +312,32 @@ if run_btn:
         st.session_state.analysis_running = False
 
 # ============================================================
-# LOAD RESULTS (YOUR ORIGINAL)
+# RESULT LOADING FUNCTIONS
 # ============================================================
 csv_path = df = map_paths = None
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_results_csv(p): 
+def load_results_csv(p: str) -> pd.DataFrame:
+    """
+    Load analysis results from CSV file. Cached for 1 hour.
+    
+    Args:
+        p: Path to CSV file.
+    Returns:
+        pd.DataFrame: Loaded data.
+    """
     return pd.read_csv(p)
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_html_map(p):
+def load_html_map(p: str) -> str | None:
+    """
+    Load HTML map content from file. Cached for 1 hour.
+    
+    Args:
+        p: Path to HTML file.
+    Returns:
+        str | None: HTML content or None if file doesn't exist.
+    """
     path = Path(p)
     if path.exists():
         try:

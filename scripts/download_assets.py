@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 """
-Download required GeoTIFF and shapefile assets from Cloudflare R2 (primary) or Google Drive (fallback).
+Download large data files from Cloudflare R2.
+
+Most data files are included in the GitHub repository. Only files >50MB
+(soil_moisture) need to be downloaded from cloud storage.
 
 Usage:
     python scripts/download_assets.py
-
-Optional flags:
-    --force         Re-download and overwrite existing files.
-    --source r2     Use Cloudflare R2 (default, recommended)
-    --source gdrive Use Google Drive (fallback, may be rate-limited)
+    python scripts/download_assets.py --force  # Re-download existing files
 """
 
 from __future__ import annotations
@@ -24,21 +23,28 @@ except ImportError:
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Cloudflare R2 (primary source - fast and reliable)
+# Cloudflare R2 public bucket URL
 R2_BASE_URL = "https://pub-d86172a936014bdc9e794890543c5f66.r2.dev"
 
-# Google Drive (fallback)
+# Google Drive fallback (deprecated, may be rate-limited)
 GOOGLE_DRIVE_FOLDER_ID = "1FvG4FM__Eam2pXggHdo5piV7gg2bljjt"
 GOOGLE_DRIVE_URL = f"https://drive.google.com/drive/folders/{GOOGLE_DRIVE_FOLDER_ID}"
 
-# Only file that needs R2 download (others are in GitHub repo)
+# Files too large for GitHub (>50MB) - must download from R2
 REQUIRED_FILES = [
-    "soil_moisture_res_250_sm_surface.tif",
+    "soil_moisture_res_250_sm_surface.tif",  # 59MB
 ]
 
 
 def download_from_r2(force: bool = False) -> int:
-    """Download assets from Cloudflare R2 (fast and reliable)."""
+    """
+    Download required files from Cloudflare R2.
+    
+    Args:
+        force: If True, re-download even if file exists.
+    Returns:
+        int: Exit code (0=success, 1=error).
+    """
     if requests is None:
         print("[ERROR] requests library not installed. Run: pip install requests", file=sys.stderr)
         return 1
@@ -87,7 +93,14 @@ def download_from_r2(force: bool = False) -> int:
 
 
 def download_from_gdrive(force: bool = False) -> int:
-    """Fallback: Download from Google Drive using gdown."""
+    """
+    Fallback: Download from Google Drive using gdown library.
+    
+    Args:
+        force: If True, re-download even if file exists.
+    Returns:
+        int: Exit code (0=success, 1=error).
+    """
     try:
         import gdown
         import shutil
@@ -144,7 +157,15 @@ def download_from_gdrive(force: bool = False) -> int:
 
 
 def download_assets(force: bool = False, source: str = "r2") -> int:
-    """Download assets from specified source."""
+    """
+    Download required data files from specified source.
+    
+    Args:
+        force: If True, re-download even if files exist.
+        source: 'r2' (default) or 'gdrive' (fallback).
+    Returns:
+        int: Exit code (0=success, 1=error).
+    """
     print(f"[INFO] PROJECT_ROOT: {PROJECT_ROOT}", flush=True)
     
     # Check existing files
