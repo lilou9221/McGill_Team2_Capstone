@@ -112,28 +112,25 @@ st.markdown('<div class="header-title">Biochar Suitability Mapper</div>', unsafe
 st.markdown('<div class="header-subtitle">Precision soil health & crop residue intelligence for sustainable biochar in Mato Grosso, Brazil</div>', unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("### View Results")
+    st.markdown("### Run Analysis")
+    use_coords = st.checkbox("Analyze around a location", value=True)
+    lat = lon = radius = None
+    if use_coords:
+        c1, c2 = st.columns(2)
+        with c1: lat = st.number_input("Latitude", value=-13.0, format="%.6f")
+        with c2: lon = st.number_input("Longitude", value=-56.0, format="%.6f")
+        radius = st.slider("Radius (km)", 25, 100, 100, 25)
+    h3_res = st.slider("H3 Resolution", 5, 9, 7)
+    run_btn = st.button("Run Analysis", type="primary", width='stretch')
+    
+    st.markdown("---")
     if st.button("Reset Cache & Restart"):
         st.cache_data.clear()
         st.session_state.clear()
         st.rerun()
-    
-    # Optional: Analysis runner (hidden by default to prevent crashes)
-    run_btn = False
-    with st.expander("⚙️ Run New Analysis (Advanced)", expanded=False):
-        st.warning("**Note:** Running analysis requires data files and may take several minutes.")
-        use_coords = st.checkbox("Analyze around a location", value=True)
-        lat = lon = radius = None
-        if use_coords:
-            c1, c2 = st.columns(2)
-            with c1: lat = st.number_input("Latitude", value=-13.0, format="%.6f")
-            with c2: lon = st.number_input("Longitude", value=-56.0, format="%.6f")
-            radius = st.slider("Radius (km)", 25, 100, 100, 25)
-        h3_res = st.slider("H3 Resolution", 5, 9, 7)
-        run_btn = st.button("Run Analysis", type="primary", width='stretch')
 
 # ============================================================
-# RUN ANALYSIS PIPELINE (OPTIONAL - HIDDEN BY DEFAULT)
+# RUN ANALYSIS PIPELINE (ON DEMAND)
 # ============================================================
 if run_btn:
     st.session_state.analysis_results = None
@@ -520,7 +517,7 @@ with farmer_tab:
         with col1:
             crop = st.selectbox("Select crop", options=list(crop_mapping.keys()), key="sourcing_crop")
         with col2:
-            farmer_yield = st.number_input("Your yield (kg/ha) – optional", min_value=0, value=None, step=100, key="sourcing_yield")
+            farmer_yield = st.number_input("Your yield (kg/ha)", min_value=0, value=None, step=100, key="sourcing_yield", help="Leave empty to use default yield from crop data")
 
         if st.button("Calculate Biochar Potential", type="primary", key="calc_sourcing"):
             # Load data only when button is clicked (lazy loading)
@@ -624,45 +621,38 @@ with farmer_tab:
         st.info("Run the analysis to view results.")
 
 # ========================================================
-# INVESTOR TAB
+# INVESTOR TAB - Independent feature, loads automatically
 # ========================================================
 with investor_tab:
-    # Use container to isolate widget interactions and prevent tab resets
-    investor_container = st.container()
-    with investor_container:
-        st.markdown("### Crop Residue Availability – Biochar Feedstock Opportunity")
+    st.markdown("### Crop Residue Availability – Biochar Feedstock Opportunity")
 
-        # Flat structure: shapefile components and CSV are directly in data/
-        boundaries_dir = PROJECT_ROOT / "data"
-        crop_data_csv = PROJECT_ROOT / "data" / "Updated_municipality_crop_production_data.csv"
+    # Flat structure: shapefile components and CSV are directly in data/
+    # These are independent of analysis results - investor map uses different data
+    boundaries_dir = PROJECT_ROOT / "data"
+    crop_data_csv = PROJECT_ROOT / "data" / "Updated_municipality_crop_production_data.csv"
 
-        # Cache file existence checks - must check for .shp file
-        @st.cache_data(ttl=3600, show_spinner=False)
-        def check_investor_data_exists():
-            shp_file = boundaries_dir / "BR_Municipios_2024.shp"
-            return shp_file.exists() and crop_data_csv.exists()
+    # Cache file existence checks - must check for .shp file
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def check_investor_data_exists():
+        shp_file = boundaries_dir / "BR_Municipios_2024.shp"
+        return shp_file.exists() and crop_data_csv.exists()
 
-        if not check_investor_data_exists():
-            st.warning("Investor map data missing.")
-            st.info("Required:\n• data/BR_Municipios_2024.shp (and .dbf, .shx, .prj, .cpg)\n• data/Updated_municipality_crop_production_data.csv")
-        else:
-            try:
-                from src.map_generators.pydeck_maps.municipality_waste_map import (
-                    prepare_investor_crop_area_geodata,
-                    create_municipality_waste_deck,
-                )
-            except Exception as e:
-                st.error("Failed to load investor map module")
-                st.code(str(e))
-                st.stop()
-
+    # Automatically load and display investor map when data is available
+    # This is completely independent of the analysis pipeline
+    try:
+        from src.map_generators.pydeck_maps.municipality_waste_map import (
+            prepare_investor_crop_area_geodata,
+            create_municipality_waste_deck,
+        )
+        
+        if check_investor_data_exists():
             @st.cache_data(show_spinner=False)
             def get_gdf():
-                return prepare_investor_crop_area_geodata(
-                    boundaries_dir,
-                    crop_data_csv,
-                    simplify_tolerance=0.05
-                )
+                    return prepare_investor_crop_area_geodata(
+                        boundaries_dir,
+                        crop_data_csv,
+                        simplify_tolerance=0.05
+                    )
 
             with st.spinner("Loading crop residue data (first time only)..."):
                 gdf = get_gdf()
@@ -724,6 +714,11 @@ with investor_tab:
                     st.metric("Total Residue", f"{gdf['total_crop_residue_ton'].sum():,.0f} t")
                 else:
                     st.metric("Total Residue", "N/A")
+        else:
+            st.info("Investor map data not available.")
+    except Exception as e:
+        st.error("Failed to load investor map")
+        st.code(str(e))
 
 # ============================================================
 # FOOTER (YOUR ORIGINAL)
