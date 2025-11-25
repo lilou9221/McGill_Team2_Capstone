@@ -84,15 +84,16 @@ def check_data_availability():
     # Show helpful message but don't crash
     if not st.session_state.get("data_warning_shown", False):
         st.info("""
-        **Data Files Missing**
+        **Some Data Files Missing**
         
-        Some data files are not available. The app will work with available data.
+        Some data files are not available. The app will work with available data and existing results.
         
-        **To download data manually:**
-        1. Run `python scripts/download_assets.py` locally
-        2. Or download from Google Drive and place files in the project directory
+        **What you can do:**
+        - View existing analysis results (if available)
+        - Use the Sourcing Tool (if crop data is available)
+        - View investor maps (if boundary and crop data are available)
         
-        **Note:** Soil data covers Mato Grosso state only.
+        **Note:** Soil data covers Mato Grosso state only. For new analysis runs, all data files must be available in the deployment environment.
         """)
         st.session_state["data_warning_shown"] = True
     
@@ -169,8 +170,22 @@ if run_btn:
     data_dir = PROJECT_ROOT / "data"
     tif_files = list(data_dir.glob("*.tif"))
     if len(tif_files) < 5:
-        st.error("Not enough GeoTIFF files in data/. Please ensure data files are available.")
-        st.info("Run `python scripts/download_assets.py` to download required files.")
+        st.error("**Cannot run new analysis: Missing required data files**")
+        st.info("""
+        **Required data files are missing from the `data/` directory.**
+        
+        To run a new analysis, you need:
+        - At least 5 GeoTIFF files (soil properties) in `data/`
+        - Shapefile components for municipality boundaries
+        - Crop production data CSV
+        
+        **Options:**
+        - If you have existing analysis results, they will be displayed automatically
+        - For new analysis, data files must be available in the deployment environment
+        - Contact the administrator to ensure data files are properly deployed
+        
+        **Note:** Soil data covers Mato Grosso state only.
+        """)
         st.stop()
     
     wrapper_script = PROJECT_ROOT / "scripts" / "run_analysis.py"
