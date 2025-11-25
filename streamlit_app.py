@@ -332,7 +332,7 @@ elif not st.session_state.get("analysis_running") and not st.session_state.get("
         }
         csv_path = potential_csv
         df = load_results_csv(str(csv_path))
-    map_paths = st.session_state.analysis_results["map_paths"]
+        map_paths = st.session_state.analysis_results["map_paths"]
     st.session_state["existing_results_checked"] = True
 
     farmer_tab, investor_tab = st.tabs(["Farmer Perspective", "Investor Perspective"])
