@@ -34,14 +34,64 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.utils.config_loader import load_config
 
 # ============================================================
-# AUTO-DOWNLOAD DATA FILES FROM GOOGLE DRIVE (DISABLED)
+# DATA FILE MANAGEMENT
 # ============================================================
-# Note: Auto-download via subprocess can cause issues on Streamlit Cloud.
-# Data files should be pre-deployed or downloaded manually.
-# The download script can be run locally: python scripts/download_assets.py
+@st.cache_resource(show_spinner=False)
+def download_data_files():
+    """Download data files from Google Drive (cached - runs once per deployment)."""
+    data_dir = PROJECT_ROOT / "data"
+    
+    # Check if files already exist
+    tif_files = list(data_dir.glob("*.tif"))
+    shp_exists = (data_dir / "BR_Municipios_2024.shp").exists()
+    
+    if len(tif_files) >= 5 and shp_exists:
+        return True, "Files already present"
+    
+    # Try to download using gdown
+    try:
+        import gdown
+        
+        GOOGLE_DRIVE_FOLDER_ID = "1FvG4FM__Eam2pXggHdo5piV7gg2bljjt"
+        
+        # Download directly to data directory
+        gdown.download_folder(
+            id=GOOGLE_DRIVE_FOLDER_ID,
+            output=str(data_dir),
+            quiet=True,
+            use_cookies=False,
+            remaining_ok=True,
+        )
+        
+        # Verify download
+        tif_files = list(data_dir.glob("*.tif"))
+        shp_files = list(data_dir.glob("*.shp"))
+        
+        # Also check subdirectories (gdown might create a subfolder)
+        for subdir in data_dir.iterdir():
+            if subdir.is_dir() and subdir.name not in ["processed", "pyrolysis", "cache"]:
+                # Move files from subfolder to data/
+                for f in subdir.glob("*"):
+                    if f.is_file():
+                        dest = data_dir / f.name
+                        if not dest.exists():
+                            import shutil
+                            shutil.move(str(f), str(dest))
+        
+        # Re-check after moving files
+        tif_files = list(data_dir.glob("*.tif"))
+        shp_exists = (data_dir / "BR_Municipios_2024.shp").exists()
+        
+        if len(tif_files) >= 5 and shp_exists:
+            return True, f"Downloaded {len(tif_files)} GeoTIFF files"
+        else:
+            return False, f"Download incomplete: {len(tif_files)} TIF files, SHP exists: {shp_exists}"
+            
+    except Exception as e:
+        return False, f"Download failed: {str(e)}"
 
 def check_data_files():
-    """Check if required data files exist (no auto-download)."""
+    """Check if required data files exist."""
     data_dir = PROJECT_ROOT / "data"
     tif_files = list(data_dir.glob("*.tif"))
     shp_exists = (data_dir / "BR_Municipios_2024.shp").exists()
@@ -67,6 +117,14 @@ def get_config():
         }
 
 config = get_config()
+
+# Download data files if missing (cached - only runs once per deployment)
+if not check_data_files():
+    with st.spinner("Downloading data files from Google Drive (first run only)..."):
+        success, message = download_data_files()
+        if not success:
+            st.warning(f"Data download: {message}. Some features may not work.")
+
 # Check essential files - must match download_assets.py targets (flat data/ structure)
 # Shapefiles need all components to work properly
 REQUIRED_DATA_FILES = [
