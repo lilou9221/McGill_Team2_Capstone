@@ -21,7 +21,7 @@ st.set_page_config(
 
 for key, default in [
     ("analysis_running", False), ("current_process", None), ("analysis_results", None),
-    ("data_downloaded", False), ("existing_results_checked", False),
+    ("existing_results_checked", False),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -74,33 +74,8 @@ def check_required_files_exist():
             missing.append(path)
     return len(missing) == 0, missing
 
-def check_data_availability():
-    """Check what data is available - graceful, no crashes."""
-    all_exist, missing = check_required_files_exist()
-    if all_exist:
-        st.session_state["data_downloaded"] = True
-        return True
-    
-    # Show helpful message but don't crash
-    if not st.session_state.get("data_warning_shown", False):
-        st.info("""
-        **Some Data Files Missing**
-        
-        Some data files are not available. The app will work with available data and existing results.
-        
-        **What you can do:**
-        - View existing analysis results (if available)
-        - Use the Sourcing Tool (if crop data is available)
-        - View investor maps (if boundary and crop data are available)
-        
-        **Note:** Soil data covers Mato Grosso state only. For new analysis runs, all data files must be available in the deployment environment.
-        """)
-        st.session_state["data_warning_shown"] = True
-    
-    return False
-
-# Check data availability (graceful, no crashes)
-check_data_availability()
+# Data availability is checked only when needed (e.g., when running analysis)
+# No upfront warnings - app works with available data silently
 
 # ============================================================
 # GLOBAL STYLING (100% YOUR ORIGINAL)
