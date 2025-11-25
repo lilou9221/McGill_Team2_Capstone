@@ -610,14 +610,6 @@ with farmer_tab:
                     
                     st.dataframe(top10_display, use_container_width=True, hide_index=True)
                     
-                    # Show feedstock distribution (cached)
-                    @st.cache_data(show_spinner=False)
-                    def get_feedstock_counts(rec_df):
-                        return rec_df["Recommended_Feedstock"].value_counts()
-                    
-                    st.markdown("### Feedstock Distribution")
-                    feedstock_counts = get_feedstock_counts(rec_df)
-                    st.bar_chart(feedstock_counts)
                 else:
                     st.info("No biochar recommendations available. All locations show 'No recommendation'.")
             else:
