@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 """
-Wrapper script to ensure dependencies are installed before running the analysis pipeline.
+Run the biochar suitability analysis pipeline.
+
+Usage:
+    python scripts/run_analysis.py [--lat LAT --lon LON --radius RADIUS]
+
+Automatically installs PyYAML if missing, then delegates to src/main.py.
 """
 import sys
 import subprocess

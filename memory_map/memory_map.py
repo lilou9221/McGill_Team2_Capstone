@@ -1,13 +1,14 @@
 """
-Data Flow Memory Map for Residual Carbon Project
+Data Flow Memory Map for Residual Carbon Project.
 
-This script generates a comprehensive flowchart showing the data flow
-for all maps generated in the Residual Carbon project.
+Generates a visual flowchart showing the data pipeline from raw GeoTIFFs
+to final interactive HTML maps. Useful for developer reference.
 
-The flowchart uses:
-- Rectangular boxes for files/data
-- Rounded boxes for processes/functions
-- Arrows to show data flow direction
+Usage:
+    python memory_map/memory_map.py
+
+Output:
+    memory_map/data_flow_memory_map.png
 """
 
 try:
@@ -22,9 +23,14 @@ except ImportError as e:
     print("Please install matplotlib: pip install matplotlib")
     print("Or install all requirements: pip install -r requirements.txt")
 
-def create_data_flow_diagram():
+def create_data_flow_diagram() -> "matplotlib.figure.Figure":
     """
-    Create a comprehensive data flow diagram for all maps in the Residual Carbon project.
+    Create a data flow diagram showing the complete processing pipeline.
+    
+    Returns:
+        matplotlib.figure.Figure: The diagram figure ready for display or saving.
+    Raises:
+        ImportError: If matplotlib is not installed.
     """
     if not MATPLOTLIB_AVAILABLE:
         raise ImportError("matplotlib is required to generate the diagram. "
@@ -460,16 +466,13 @@ def create_data_flow_diagram():
     plt.tight_layout()
     return fig
 
-def save_diagram(output_path='data_flow_memory_map.png', dpi=300):
+def save_diagram(output_path: str = 'data_flow_memory_map.png', dpi: int = 300) -> None:
     """
-    Create and save the data flow diagram.
+    Create and save the data flow diagram to a PNG file.
     
-    Parameters
-    ----------
-    output_path : str
-        Path to save the diagram
-    dpi : int
-        Resolution for the saved image
+    Args:
+        output_path: Destination path for the PNG file.
+        dpi: Image resolution (dots per inch).
     """
     fig = create_data_flow_diagram()
     fig.savefig(output_path, dpi=dpi, bbox_inches='tight', facecolor='white')
