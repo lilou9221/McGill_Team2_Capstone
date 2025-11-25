@@ -1,76 +1,39 @@
 import pandas as pd
-import yaml
-from pathlib import Path
+import streamlit as st
 
-def load_crop_config():
-    with open("configs/crop_config.yaml") as f:
-        return yaml.safe_load(f)
+@st.cache_data(ttl=3600)
+def load_residue_ratios():
+    return pd.read_excel("data/raw/residue_ratios.xlsx", sheet_name="Sheet1")
 
-def load_harvest_data():
-    path = "data/raw/brazil_crop_harvest_area_2017-2024.xlsx"
-    return pd.read_excel(path)
+def calculate_biochar_from_yield(yield_kg_ha, crop_name, pyrolysis_yield=0.30):
+    ratios = load_residue_ratios()
+    row = ratios[ratios["Crop"] == crop_name]
+    if row.empty:
+        return 0, 0, 0
+    urr = row["URR (t residue/t grain) Assuming AF = 0.5"].iloc[0]
+    if pd.isna(urr):
+        urr = row["Doesn't require AF"].iloc[0]
+    residue_t_ha = (yield_kg_ha / 1000) * urr
+    biochar_t_ha = residue_t_ha * pyrolysis_yield
+    return round(residue_t_ha, 2), round(biochar_t_ha, 2), urr
 
-def get_latest_year_data(df: pd.DataFrame, crop_pt_name: str, state: str = None):
-    # Filter exact Portuguese crop name
-    mask_crop = df["Crop"] == crop_pt_name
-    df_crop = df[mask_crop].copy()
+def get_mato_grosso_crop_table(crop_portuguese_name, farmer_yield=None):
+    harvest = pd.read_excel("data/raw/brazil_crop_harvest_area_2017-2024.xlsx")
+    df = harvest[(harvest["Crop"] == crop_portuguese_name) & 
+                 (harvest["Municipality"].str.contains("(MT)"))]
+    latest_year = df["Year"].max()
+    df = df[df["Year"] == latest_year].copy()
     
-    if state:
-        df_crop = df_crop[df_crop["Municipality"].str.contains(f"({state})", case=False)]
+    residue_list = []
+    biochar_list = []
+    for _, row in df.iterrows():
+        yield_to_use = farmer_yield or 3500  # fallback MT avg
+        residue, biochar, _ = calculate_biochar_from_yield(yield_to_use, crop_portuguese_name.split()[0])
+        residue_list.append(residue * row["Harvested_area_ha"])
+        biochar_list.append(biochar * row["Harvested_area_ha"])
     
-    # Latest year available
-    latest_year = df_crop["Year"].max()
-    df_latest = df_crop[df_crop["Year"] == latest_year].copy()
+    df["Residue_t_total"] = residue_list
+    df["Biochar_t_total"] = biochar_list
+    df["Biochar_t_per_ha"] = df["Biochar_t_total"] / df["Harvested_area_ha"]
     
-    # Calculate production (tons) from area × average MT yield if missing
-    # (some rows have area only → we’ll impute later if needed)
-    return df_latest, latest_year
-
-def calculate_biochar_potential(
-    harvested_area_ha: float,
-    yield_kg_ha: float,
-    residue_ratio: float,
-    pyrolysis_yield: float = 0.30
-):
-    grain_t = (yield_kg_ha * harvested_area_ha) / 1000
-    residue_t = grain_t * residue_ratio
-    biochar_t = residue_t * pyrolysis_yield
-    return {
-        "grain_t": round(grain_t, 2),
-        "residue_t": round(residue_t, 2),
-        "biochar_t": round(biochar_t, 2),
-        "biochar_t_per_ha": round(biochar_t / harvested_area_ha, 3) if harvested_area_ha else 0
-    }
-
-def enhance_with_biomass(
-    df: pd.DataFrame,
-    crop_key: str,                     # 'soybean' | 'maize' | etc.
-    farmer_yield_kg_ha: float = None   # optional override
-):
-    config = load_crop_config()
-    crop = config["crops"][crop_key]
-    ratio = crop["residue_ratio"]
-    pyro = config["pyrolysis_yield"]
-    
-    # Use farmer input or fall back to Mato Grosso 2024 averages (hardcoded for reliability)
-    default_yields = {
-        "soybean": 3520,
-        "maize": 6200,
-        "sugarcane": 78500,
-        "cotton": 1780
-    }
-    yield_used = farmer_yield_kg_ha or default_yields[crop_key]
-    
-    results = df["Harvested_area_ha"].apply(
-        lambda area: calculate_biochar_potential(area, yield_used, ratio, pyro)
-    )
-    results_df = pd.json_normalize(results)
-    
-    enhanced = pd.concat([df.reset_index(drop=True), results_df], axis=1)
-    enhanced["Yield_used_kg_ha"] = yield_used
-    enhanced["Crop_Selected"] = crop["english"]
-    
-    # Sort by biggest biochar potential
-    enhanced = enhanced.sort_values("biochar_t", ascending=False)
-    
-    return enhanced
+    return df.sort_values("Biochar_t_total", ascending=False), latest_year
