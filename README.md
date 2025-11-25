@@ -93,28 +93,29 @@ This script will download:
 
 **Manual Data Placement (Alternative):**
 
-If you prefer to place files manually, ensure the following structure:
+If you prefer to place files manually, ensure the following flat structure (all files directly in `data/`):
 
 ```bash
 data/
-├── raw/
-│   ├── SOC_res_250_b0.tif
-│   ├── SOC_res_250_b10.tif
-│   ├── soil_moisture_res_250_sm_surface.tif
-│   ├── soil_pH_res_250_b0.tif
-│   ├── soil_pH_res_250_b10.tif
-│   └── soil_temp_res_250_soil_temp_layer1.tif
-├── BR_Municipios_2024.shp (and .dbf, .shx, .prj, .cpg)  # Flat structure: all files in data/
-│   ├── BR_Municipios_2024.shp
-│   ├── BR_Municipios_2024.dbf
-│   ├── BR_Municipios_2024.shx
-│   ├── BR_Municipios_2024.prj
-│   └── BR_Municipios_2024.cpg
-└── crop_data/
-    └── Updated_municipality_crop_production_data.csv
+├── BR_Municipios_2024.shp
+├── BR_Municipios_2024.dbf
+├── BR_Municipios_2024.shx
+├── BR_Municipios_2024.prj
+├── BR_Municipios_2024.cpg
+├── Updated_municipality_crop_production_data.csv
+├── SOC_res_250_b0.tif
+├── SOC_res_250_b10.tif
+├── soil_moisture_res_250_sm_surface.tif
+├── soil_pH_res_250_b0.tif
+├── soil_pH_res_250_b10.tif
+├── soil_temp_res_250_soil_temp_layer1.tif
+├── residue_ratios.csv
+├── brazil_crop_harvest_area_2017-2024.csv
+└── processed/          # Outputs only (created automatically)
+    └── cache/          # Cache files (created automatically)
 ```
 
-**Note:** The Streamlit app will automatically download missing files on first run. See `STREAMLIT_DEPLOYMENT.md` for more details.
+**Note:** All files should be placed directly in the `data/` directory (flat structure). The `data/processed/` subdirectory is created automatically for outputs. See `STREAMLIT_DEPLOYMENT.md` for deployment details.
 
 ## Configuration
 
@@ -197,12 +198,18 @@ Residual_Carbon/
 │   ├── map_generators/   # Map generation (suitability, SOC, pH, moisture, investor maps)
 │   └── utils/            # Utility functions (cache, config, geospatial)
 ├── configs/              # Configuration files
-├── data/
-│   ├── raw/              # GeoTIFF files and Excel data files
-│   ├── boundaries/       # Shapefile boundaries
-│   ├── crop_data/        # Crop production data CSVs
-│   ├── pyrolysis/        # Pyrolysis/biochar feedstock data
-│   └── processed/        # Processed outputs
+├── data/                 # Flat structure: all input files directly here
+│   ├── BR_Municipios_2024.shp (and .dbf, .shx, .prj, .cpg)
+│   ├── Updated_municipality_crop_production_data.csv
+│   ├── SOC_res_250_b0.tif
+│   ├── SOC_res_250_b10.tif
+│   ├── soil_moisture_res_250_sm_surface.tif
+│   ├── soil_pH_res_250_b0.tif
+│   ├── soil_pH_res_250_b10.tif
+│   ├── soil_temp_res_250_soil_temp_layer1.tif
+│   ├── residue_ratios.csv
+│   ├── brazil_crop_harvest_area_2017-2024.csv
+│   └── processed/        # Processed outputs (created automatically)
 │       └── cache/        # Cache directory (clipped rasters, DataFrames, H3 indexes)
 ├── output/
 │   └── html/             # HTML map files
