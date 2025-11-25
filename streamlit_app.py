@@ -1,4 +1,4 @@
-cat > streamlit_app.py << 'EOF'
+
 # ============================================================
 # STREAMLIT APP – FINAL POLISHED & LIGHTNING-FAST VERSION + YOUR REQUESTS
 # ============================================================
@@ -193,4 +193,3 @@ st.markdown("""
     Precision biochar mapping for farmers and investors in Mato Grosso, Brazil
 </div>
 """, unsafe_allow_html=True)
-EOF
