@@ -134,10 +134,8 @@ def download_r2_files() -> tuple[list[str], list[str]]:
 
 # Download large files from R2 if missing
 if not check_data_files():
-    with st.spinner("Downloading large data file from cloud storage..."):
+    with st.spinner("Downloading data file..."):
         downloaded, errors = download_r2_files()
-        if downloaded:
-            st.success(f"Downloaded {len(downloaded)} file(s).")
         if errors:
             st.error(f"Failed to download: {errors}")
 
