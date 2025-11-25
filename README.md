@@ -55,7 +55,7 @@ pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-The app will automatically download required data files from Google Drive on first run.
+The app will automatically download required data files from Cloudflare R2 on first run.
 
 ### 3. Use the Interface
 
@@ -65,7 +65,7 @@ The app will automatically download required data files from Google Drive on fir
 
 ## Data Files
 
-Data files are automatically downloaded from Google Drive. Required files:
+Data files are automatically downloaded from Cloudflare R2 (fast, no rate limits). Required files:
 
 | File | Description |
 |------|-------------|
@@ -104,7 +104,7 @@ biochar-mapper/
 │   └── utils/            # Caching, configuration, helpers
 ├── scripts/
 │   ├── run_analysis.py   # Analysis wrapper
-│   └── download_assets.py # Data download from Google Drive
+│   └── download_assets.py # Data download from Cloudflare R2
 ├── data/
 │   ├── pyrolysis/        # Biochar feedstock data
 │   └── processed/        # Analysis outputs

@@ -34,24 +34,77 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.utils.config_loader import load_config
 
 # ============================================================
-# DATA FILE CHECK (download disabled - use scripts/download_assets.py locally)
+# DATA FILE MANAGEMENT - Downloads from Cloudflare R2
 # ============================================================
+import urllib.request
+
+R2_BASE_URL = "https://pub-d86172a936014bdc9e794890543c5f66.r2.dev"
+
+# All required data files with their filenames
+REQUIRED_FILES = [
+    "BR_Municipios_2024.shp",
+    "BR_Municipios_2024.dbf",
+    "BR_Municipios_2024.shx",
+    "BR_Municipios_2024.prj",
+    "BR_Municipios_2024.cpg",
+    "Updated_municipality_crop_production_data.csv",
+    "brazil_crop_harvest_area_2017-2024.csv",
+    "residue_ratios.csv",
+    "SOC_res_250_b0.tif",
+    "SOC_res_250_b10.tif",
+    "soil_moisture_res_250_sm_surface.tif",
+    "soil_pH_res_250_b0.tif",
+    "soil_pH_res_250_b10.tif",
+    "soil_temp_res_250_soil_temp_layer1.tif",
+]
+
 def check_data_files():
     """Check if required data files exist."""
     try:
         data_dir = PROJECT_ROOT / "data"
-        tif_files = list(data_dir.glob("*.tif"))
-        shp_exists = (data_dir / "BR_Municipios_2024.shp").exists()
-        return len(tif_files) >= 5 and shp_exists
+        missing = [f for f in REQUIRED_FILES if not (data_dir / f).exists()]
+        return len(missing) == 0
     except Exception:
         return False
+
+@st.cache_resource(show_spinner=False)
+def download_data_from_r2():
+    """Download missing data files from Cloudflare R2."""
+    data_dir = PROJECT_ROOT / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    
+    downloaded = []
+    errors = []
+    
+    for filename in REQUIRED_FILES:
+        dest = data_dir / filename
+        if dest.exists() and dest.stat().st_size > 0:
+            continue  # Skip existing files
+        
+        url = f"{R2_BASE_URL}/{filename}"
+        try:
+            urllib.request.urlretrieve(url, dest)
+            downloaded.append(filename)
+        except Exception as e:
+            errors.append(f"{filename}: {e}")
+    
+    return downloaded, errors
+
+# Auto-download on startup if files are missing
+if not check_data_files():
+    with st.spinner("Downloading data files from cloud storage..."):
+        downloaded, errors = download_data_from_r2()
+        if downloaded:
+            st.success(f"Downloaded {len(downloaded)} data files.")
+        if errors:
+            st.warning(f"Some files failed to download: {len(errors)} errors")
 
 @st.cache_data
 def get_config():
     try:
         config = load_config()
         defaults = {
-            "data": {"raw": "data", "processed": "data/processed"},  # Flat structure: data/ contains all input files
+            "data": {"raw": "data", "processed": "data/processed"},
             "output": {"html": "output/html"},
             "processing": {"h3_resolution": 7}
         }
@@ -60,25 +113,15 @@ def get_config():
         return config
     except:
         return {
-            "data": {"raw": "data", "processed": "data/processed"},  # Flat structure: data/ contains all input files
+            "data": {"raw": "data", "processed": "data/processed"},
             "output": {"html": "output/html"},
             "processing": {"h3_resolution": 7}
         }
 
 config = get_config()
 
-# Check essential files - must match download_assets.py targets (flat data/ structure)
-# Shapefiles need all components to work properly
-REQUIRED_DATA_FILES = [
-    # Shapefile components (all required for shapefile to work)
-    PROJECT_ROOT / "data" / "BR_Municipios_2024.shp",
-    PROJECT_ROOT / "data" / "BR_Municipios_2024.dbf",
-    PROJECT_ROOT / "data" / "BR_Municipios_2024.shx",
-    PROJECT_ROOT / "data" / "BR_Municipios_2024.prj",
-    PROJECT_ROOT / "data" / "BR_Municipios_2024.cpg",
-    # Crop data
-    PROJECT_ROOT / "data" / "Updated_municipality_crop_production_data.csv",
-]
+# Legacy compatibility
+REQUIRED_DATA_FILES = [PROJECT_ROOT / "data" / f for f in REQUIRED_FILES[:6]]
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def check_required_files_exist():
@@ -87,9 +130,6 @@ def check_required_files_exist():
         if not path.exists() or (path.exists() and path.stat().st_size == 0):
             missing.append(path)
     return len(missing) == 0, missing
-
-# Data availability is checked only when needed (e.g., when running analysis)
-# No upfront warnings - app works with available data silently
 
 # ============================================================
 # GLOBAL STYLING (100% YOUR ORIGINAL)
