@@ -32,11 +32,11 @@ GOOGLE_DRIVE_FOLDER_ID = "1FvG4FM__Eam2pXggHdo5piV7gg2bljjt"
 GOOGLE_DRIVE_URL = f"https://drive.google.com/drive/folders/{GOOGLE_DRIVE_FOLDER_ID}"
 
 REQUIRED_FILES = [
-    "BR_Municipios_2024.shp",
-    "BR_Municipios_2024.dbf",
-    "BR_Municipios_2024.shx",
-    "BR_Municipios_2024.prj",
-    "BR_Municipios_2024.cpg",
+    "BR_Municipios_2024_simplified.shp",
+    "BR_Municipios_2024_simplified.dbf",
+    "BR_Municipios_2024_simplified.shx",
+    "BR_Municipios_2024_simplified.prj",
+    "BR_Municipios_2024_simplified.cpg",
     "Updated_municipality_crop_production_data.csv",
     "SOC_res_250_b0.tif",
     "SOC_res_250_b10.tif",

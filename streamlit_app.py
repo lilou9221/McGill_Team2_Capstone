@@ -41,12 +41,13 @@ import requests
 R2_BASE_URL = "https://pub-d86172a936014bdc9e794890543c5f66.r2.dev"
 
 # Required files with expected sizes for verification (prevents corrupted downloads)
+# Using simplified shapefile (11MB vs 287MB) for faster/reliable downloads
 REQUIRED_FILES = {
-    "BR_Municipios_2024.shp": 286858448,
-    "BR_Municipios_2024.dbf": 2865036,
-    "BR_Municipios_2024.shx": 44684,
-    "BR_Municipios_2024.prj": 151,
-    "BR_Municipios_2024.cpg": 5,
+    "BR_Municipios_2024_simplified.shp": 5222040,
+    "BR_Municipios_2024_simplified.dbf": 6381599,
+    "BR_Municipios_2024_simplified.shx": 44684,
+    "BR_Municipios_2024_simplified.prj": 151,
+    "BR_Municipios_2024_simplified.cpg": 5,
     "Updated_municipality_crop_production_data.csv": 1605740,
     "brazil_crop_harvest_area_2017-2024.csv": 25409421,
     "residue_ratios.csv": 179,
@@ -715,7 +716,7 @@ with investor_tab:
 
     # Check file existence (no cache - cheap operation, needs to be accurate after downloads)
     def check_investor_data_exists():
-        shp_file = boundaries_dir / "BR_Municipios_2024.shp"
+        shp_file = boundaries_dir / "BR_Municipios_2024_simplified.shp"
         shp_exists = shp_file.exists()
         csv_exists = crop_data_csv.exists()
         return shp_exists and csv_exists, shp_exists, csv_exists
@@ -802,7 +803,7 @@ with investor_tab:
         else:
             missing = []
             if not shp_exists:
-                missing.append("BR_Municipios_2024.shp (shapefile)")
+                missing.append("BR_Municipios_2024_simplified.shp (shapefile)")
             if not csv_exists:
                 missing.append("Updated_municipality_crop_production_data.csv")
             st.info(f"Investor map data not available. Missing: {', '.join(missing)}")

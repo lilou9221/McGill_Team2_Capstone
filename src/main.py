@@ -294,7 +294,7 @@ def main() -> int:
         boundaries_dir = project_root / "data"
         waste_csv_path = project_root / "data" / "Updated_municipality_crop_production_data.csv"
         # Check for .shp file existence
-        shp_file = boundaries_dir / "BR_Municipios_2024.shp"
+        shp_file = boundaries_dir / "BR_Municipios_2024_simplified.shp"
         if shp_file.exists() and waste_csv_path.exists():
             try:
                 _, merged_gdf = build_investor_waste_deck_html(
