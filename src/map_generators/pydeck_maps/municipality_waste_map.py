@@ -10,6 +10,17 @@ import geopandas as gpd
 import pandas as pd
 import pydeck as pdk
 
+# Try to import streamlit for caching (if available)
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+    # Create a dummy cache decorator if streamlit is not available
+    def _dummy_cache(func):
+        return func
+    st = type('obj', (object,), {'cache_data': lambda *args, **kwargs: lambda f: f})()
+
 
 def _find_boundary_file(boundary_dir: Path) -> Path:
     """Return the first boundary file we can read (GPKG or SHP)."""
@@ -37,13 +48,22 @@ def _normalize_name(value: str) -> str:
 
 
 def load_municipality_boundaries(boundary_dir: Path) -> gpd.GeoDataFrame:
-    boundary_file = _find_boundary_file(boundary_dir)
-    gdf = gpd.read_file(boundary_file)
-    if gdf.crs and gdf.crs.to_epsg() != 4326:
-        gdf = gdf.to_crs(epsg=4326)
-    gdf["NM_MUN_norm"] = gdf["NM_MUN"].apply(_normalize_name)
-    gdf["SIGLA_UF"] = gdf["SIGLA_UF"].astype(str)
-    return gdf
+    """Load municipality boundaries with caching if Streamlit is available."""
+    def _load_impl(boundary_dir: Path) -> gpd.GeoDataFrame:
+        boundary_file = _find_boundary_file(boundary_dir)
+        gdf = gpd.read_file(boundary_file)
+        if gdf.crs and gdf.crs.to_epsg() != 4326:
+            gdf = gdf.to_crs(epsg=4326)
+        gdf["NM_MUN_norm"] = gdf["NM_MUN"].apply(_normalize_name)
+        gdf["SIGLA_UF"] = gdf["SIGLA_UF"].astype(str)
+        return gdf
+    
+    if HAS_STREAMLIT:
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def _cached_load(boundary_dir_str: str):
+            return _load_impl(Path(boundary_dir_str))
+        return _cached_load(str(boundary_dir))
+    return _load_impl(boundary_dir)
 
 
 def _infer_numeric_columns(df: pd.DataFrame) -> None:
@@ -55,52 +75,53 @@ def _infer_numeric_columns(df: pd.DataFrame) -> None:
 
 
 def load_crop_area_dataframe(csv_path: Path) -> pd.DataFrame:
-    df = pd.read_csv(csv_path)
-    _infer_numeric_columns(df)
+    """Load crop area dataframe with caching if Streamlit is available."""
+    def _load_impl(csv_path: Path) -> pd.DataFrame:
+        df = pd.read_csv(csv_path)
+        _infer_numeric_columns(df)
 
-    if "municipality_name" in df.columns:
-        df["municipality_name_norm"] = df["municipality_name"].apply(_normalize_name)
-    else:
-        df["municipality_name_norm"] = (
-            df["municipality_with_state"]
-            .str.split("(")
-            .str[0]
-            .str.strip()
-            .apply(_normalize_name)
-        )
-    df["state_abbrev"] = df["municipality_with_state"].str.extract(r"\((.*?)\)").iloc[:, 0]
-    df["state_abbrev"] = df["state_abbrev"].fillna("").str.strip().str.upper()
+        if "municipality_name" in df.columns:
+            df["municipality_name_norm"] = df["municipality_name"].apply(_normalize_name)
+        else:
+            df["municipality_name_norm"] = (
+                df["municipality_with_state"]
+                .str.split("(")
+                .str[0]
+                .str.strip()
+                .apply(_normalize_name)
+            )
+        df["state_abbrev"] = df["municipality_with_state"].str.extract(r"\((.*?)\)").iloc[:, 0]
+        df["state_abbrev"] = df["state_abbrev"].fillna("").str.strip().str.upper()
 
-    # Calculate all three data types: area, production, and residue
-    # Filter out None column names and ensure columns are strings
-    valid_cols = [col for col in df.columns if col is not None and isinstance(col, str)]
-    # Area columns end with '(ha)'
-    area_cols = [col for col in valid_cols if col.endswith('(ha)')]
-    # Production columns end with '(ton)' but don't start with 'Residue'
-    production_cols = [col for col in valid_cols if col.endswith('(ton)') and not col.startswith('Residue')]
-    # Residue columns start with 'Residue' and end with '(ton)'
-    residue_cols = [col for col in valid_cols if col.startswith('Residue') and col.endswith('(ton)')]
-    
-    # Calculate all sums at once to avoid DataFrame fragmentation
-    # Round production and residue to nearest integer
-    totals = pd.DataFrame({
-        "total_crop_area_ha": df[area_cols].fillna(0).sum(axis=1),
-        "total_crop_production_ton": df[production_cols].fillna(0).sum(axis=1).round().astype(int),
-        "total_crop_residue_ton": df[residue_cols].fillna(0).sum(axis=1).round().astype(int)
-    })
-    df = pd.concat([df, totals], axis=1)
-
-    agg = (
-        df.groupby(["municipality_name_norm", "state_abbrev"], as_index=False).agg({
-            "total_crop_area_ha": "sum",
-            "total_crop_production_ton": "sum",
-            "total_crop_residue_ton": "sum"
+        valid_cols = [col for col in df.columns if col is not None and isinstance(col, str)]
+        area_cols = [col for col in valid_cols if col.endswith('(ha)')]
+        production_cols = [col for col in valid_cols if col.endswith('(ton)') and not col.startswith('Residue')]
+        residue_cols = [col for col in valid_cols if col.startswith('Residue') and col.endswith('(ton)')]
+        
+        totals = pd.DataFrame({
+            "total_crop_area_ha": df[area_cols].fillna(0).sum(axis=1),
+            "total_crop_production_ton": df[production_cols].fillna(0).sum(axis=1).round().astype(int),
+            "total_crop_residue_ton": df[residue_cols].fillna(0).sum(axis=1).round().astype(int)
         })
-    )
-    # Round production and residue to nearest integer after aggregation
-    agg["total_crop_production_ton"] = agg["total_crop_production_ton"].round().astype(int)
-    agg["total_crop_residue_ton"] = agg["total_crop_residue_ton"].round().astype(int)
-    return agg
+        df = pd.concat([df, totals], axis=1)
+
+        agg = (
+            df.groupby(["municipality_name_norm", "state_abbrev"], as_index=False).agg({
+                "total_crop_area_ha": "sum",
+                "total_crop_production_ton": "sum",
+                "total_crop_residue_ton": "sum"
+            })
+        )
+        agg["total_crop_production_ton"] = agg["total_crop_production_ton"].round().astype(int)
+        agg["total_crop_residue_ton"] = agg["total_crop_residue_ton"].round().astype(int)
+        return agg
+    
+    if HAS_STREAMLIT:
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def _cached_load(csv_path_str: str):
+            return _load_impl(Path(csv_path_str))
+        return _cached_load(str(csv_path))
+    return _load_impl(csv_path)
 
 
 def _simplify_geometries(gdf: gpd.GeoDataFrame, tolerance: float = 0.01) -> gpd.GeoDataFrame:
@@ -286,23 +307,14 @@ def create_municipality_waste_deck(
     return deck
 
 
-def build_investor_waste_deck(
-    boundary_dir: Path, waste_csv_path: Path, simplify_tolerance: float = 0.01, data_type: str = "area"
-) -> Tuple[pdk.Deck, gpd.GeoDataFrame]:
-    merged_gdf = prepare_investor_crop_area_geodata(
-        boundary_dir, waste_csv_path, simplify_tolerance=simplify_tolerance
-    )
-    deck = create_municipality_waste_deck(merged_gdf, data_type=data_type)
-    return deck, merged_gdf
-
-
 def build_investor_waste_deck_html(
     boundary_dir: Path, waste_csv_path: Path, output_path: Path, simplify_tolerance: float = 0.01, data_type: str = "area"
 ) -> Tuple[str, gpd.GeoDataFrame]:
     """Build investor waste deck and save as HTML."""
-    deck, merged_gdf = build_investor_waste_deck(
-        boundary_dir, waste_csv_path, simplify_tolerance=simplify_tolerance, data_type=data_type
+    merged_gdf = prepare_investor_crop_area_geodata(
+        boundary_dir, waste_csv_path, simplify_tolerance=simplify_tolerance
     )
+    deck = create_municipality_waste_deck(merged_gdf, data_type=data_type)
     
     # Generate HTML - pydeck's to_html() returns None if called without arguments
     try:

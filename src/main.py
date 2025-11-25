@@ -43,9 +43,6 @@ from src.map_generators.pydeck_maps.municipality_waste_map import (
     build_investor_waste_deck_html,
 )
 
-# Future feature: Biochar recommender integration
-# When ready, uncomment the following line to enable biochar recommendations:
-# from src.analyzers.biochar_recommender import recommend_biochar
 
 def ensure_rasters_acquired(raw_dir: Path) -> List[Path]:
     """

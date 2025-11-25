@@ -70,7 +70,7 @@ REQUIRED_DATA_FILES = [
     PROJECT_ROOT / "data" / "raw" / "soil_temp_res_250_soil_temp_layer1.tif",
 ]
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def check_required_files_exist():
     missing = []
     for path in REQUIRED_DATA_FILES:
@@ -307,12 +307,19 @@ if run_btn:
 # LOAD RESULTS (YOUR ORIGINAL)
 # ============================================================
 csv_path = df = map_paths = None
-@st.cache_data(ttl=3600)
-def load_results_csv(p): return pd.read_csv(p)
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_results_csv(p): 
+    return pd.read_csv(p)
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_html_map(p):
     path = Path(p)
-    return path.read_text(encoding="utf-8") if path.exists() else None
+    if path.exists():
+        try:
+            return path.read_text(encoding="utf-8")
+        except Exception:
+            return None
+    return None
 
 if st.session_state.get("analysis_results"):
     analysis_results = st.session_state.analysis_results
@@ -352,20 +359,35 @@ with farmer_tab:
     if csv_path and df is not None and map_paths:
         # === YOUR ORIGINAL MAPS & RECOMMENDATIONS (UNCHANGED) ===
         st.markdown("### Soil Health & Biochar Suitability Insights (Mato Grosso State)")
+        
+        # Cache expensive calculations to avoid recomputing on every rerun
+        @st.cache_data(show_spinner=False)
+        def calculate_metrics(df):
+            metrics = {"count": len(df)}
+            if "suitability_score" in df.columns:
+                metrics["mean_score"] = float(df["suitability_score"].mean())
+                high = int((df["suitability_score"] >= 7.0).sum())
+                metrics["high_count"] = high
+                metrics["high_pct"] = float(high / len(df) * 100) if len(df) > 0 else 0.0
+            else:
+                metrics["mean_score"] = None
+                metrics["high_count"] = None
+                metrics["high_pct"] = None
+            return metrics
+        
+        metrics = calculate_metrics(df)
+        
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f'<div class="metric-card"><h4>Hexagons Analyzed</h4><p>{len(df):,}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4>Hexagons Analyzed</h4><p>{metrics["count"]:,}</p></div>', unsafe_allow_html=True)
         with col2:
-            if "suitability_score" in df.columns:
-                mean_score = df["suitability_score"].mean()
-                st.markdown(f'<div class="metric-card"><h4>Mean Suitability Score</h4><p>{mean_score:.2f}</p></div>', unsafe_allow_html=True)
+            if metrics["mean_score"] is not None:
+                st.markdown(f'<div class="metric-card"><h4>Mean Suitability Score</h4><p>{metrics["mean_score"]:.2f}</p></div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="metric-card"><h4>Mean Suitability Score</h4><p>N/A</p></div>', unsafe_allow_html=True)
         with col3:
-            if "suitability_score" in df.columns:
-                high = (df["suitability_score"] >= 7.0).sum()
-                pct = high / len(df) * 100
-                st.markdown(f'<div class="metric-card"><h4>High Suitability (≥7.0)</h4><p>{high:,}<br><small>({pct:.1f}%)</small></p></div>', unsafe_allow_html=True)
+            if metrics["high_count"] is not None:
+                st.markdown(f'<div class="metric-card"><h4>High Suitability (≥7.0)</h4><p>{metrics["high_count"]:,}<br><small>({metrics["high_pct"]:.1f}%)</small></p></div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="metric-card"><h4>High Suitability (≥7.0)</h4><p>N/A</p></div>', unsafe_allow_html=True)
 
@@ -512,29 +534,34 @@ with farmer_tab:
                             high_quality = (rec_df["Data_Quality"] == "high").sum()
                             st.metric("High Quality Data", f"{high_quality:,} ({high_quality/total_locations*100:.1f}%)")
                     
-                    # Show top 10 by suitability score
+                    # Show top 10 by suitability score (cached calculation)
+                    @st.cache_data(show_spinner=False)
+                    def get_top10_recommendations(rec_df):
+                        display_cols = ["suitability_score", "suitability_grade", "Recommended_Feedstock", "Recommendation_Reason"]
+                        if "Data_Source" in rec_df.columns and "Data_Quality" in rec_df.columns:
+                            display_cols.extend(["Data_Source", "Data_Quality"])
+                        if "lat" in rec_df.columns and "lon" in rec_df.columns:
+                            display_cols.extend(["lat", "lon"])
+                        
+                        display_cols = [c for c in display_cols if c in rec_df.columns]
+                        if "suitability_score" in display_cols:
+                            top10 = rec_df[display_cols].sort_values("suitability_score", ascending=False).head(10)
+                        elif display_cols:
+                            top10 = rec_df[display_cols].head(10)
+                        else:
+                            top10 = rec_df.head(10)
+                        
+                        # Format the dataframe for display
+                        top10_display = top10.copy()
+                        if "suitability_score" in top10_display.columns:
+                            top10_display["suitability_score"] = top10_display["suitability_score"].round(2)
+                        if "lat" in top10_display.columns and "lon" in top10_display.columns:
+                            top10_display["lat"] = top10_display["lat"].round(4)
+                            top10_display["lon"] = top10_display["lon"].round(4)
+                        return top10_display
+                    
                     st.markdown("### Top 10 Recommended Locations (by Suitability Score)")
-                    display_cols = ["suitability_score", "suitability_grade", "Recommended_Feedstock", "Recommendation_Reason"]
-                    if "Data_Source" in rec_df.columns and "Data_Quality" in rec_df.columns:
-                        display_cols.extend(["Data_Source", "Data_Quality"])
-                    if "lat" in rec_df.columns and "lon" in rec_df.columns:
-                        display_cols.extend(["lat", "lon"])
-                    
-                    display_cols = [c for c in display_cols if c in rec_df.columns]
-                    if "suitability_score" in display_cols:
-                        top10 = rec_df[display_cols].sort_values("suitability_score", ascending=False).head(10)
-                    elif display_cols:
-                        top10 = rec_df[display_cols].head(10)
-                    else:
-                        top10 = rec_df.head(10)
-                    
-                    # Format the dataframe for display
-                    top10_display = top10.copy()
-                    if "suitability_score" in top10_display.columns:
-                        top10_display["suitability_score"] = top10_display["suitability_score"].round(2)
-                    if "lat" in top10_display.columns and "lon" in top10_display.columns:
-                        top10_display["lat"] = top10_display["lat"].round(4)
-                        top10_display["lon"] = top10_display["lon"].round(4)
+                    top10_display = get_top10_recommendations(rec_df)
                     
                     # Rename columns for better display
                     rename_map = {
@@ -551,9 +578,13 @@ with farmer_tab:
                     
                     st.dataframe(top10_display, use_container_width=True, hide_index=True)
                     
-                    # Show feedstock distribution
+                    # Show feedstock distribution (cached)
+                    @st.cache_data(show_spinner=False)
+                    def get_feedstock_counts(rec_df):
+                        return rec_df["Recommended_Feedstock"].value_counts()
+                    
                     st.markdown("### Feedstock Distribution")
-                    feedstock_counts = rec_df["Recommended_Feedstock"].value_counts()
+                    feedstock_counts = get_feedstock_counts(rec_df)
                     st.bar_chart(feedstock_counts)
                 else:
                     st.info("No biochar recommendations available. All locations show 'No recommendation'.")
@@ -563,15 +594,14 @@ with farmer_tab:
         # === SOURCING TOOL – CROP RESIDUE & BIOCHAR POTENTIAL ===
         st.markdown("### Sourcing Tool – Crop Residue & Biochar Potential (Mato Grosso only)")
 
-        @st.cache_data(ttl=3600)
+        # Cache data loading functions (moved outside to avoid redefinition on reruns)
+        @st.cache_data(ttl=3600, show_spinner=False)
         def load_ratios():
             return pd.read_csv(PROJECT_ROOT / "data" / "raw" / "residue_ratios.csv")
 
-        @st.cache_data(ttl=3600)
+        @st.cache_data(ttl=3600, show_spinner=False)
         def load_harvest_data():
             return pd.read_csv(PROJECT_ROOT / "data" / "raw" / "brazil_crop_harvest_area_2017-2024.csv")
-
-        ratios = load_ratios()
         
         # Mapping: English crop name -> (Portuguese name in harvest file, English name in ratios file)
         crop_mapping = {
@@ -588,16 +618,20 @@ with farmer_tab:
             farmer_yield = st.number_input("Your yield (kg/ha) – optional", min_value=0, value=None, step=100, key="sourcing_yield")
 
         if st.button("Calculate Biochar Potential", type="primary", key="calc_sourcing"):
-            try:
+            # Load data only when button is clicked (lazy loading)
+            with st.spinner("Loading crop data..."):
+                ratios = load_ratios()
                 harvest = load_harvest_data()
+            try:
                 crop_portuguese, crop_english = crop_mapping[crop]
                 
-                # Filter for Mato Grosso municipalities
+                # Filter for Mato Grosso municipalities (optimized: filter by state first)
                 df_crop = harvest[
                     (harvest["Crop"] == crop_portuguese) & 
                     harvest["Municipality"].str.contains("\\(MT\\)", na=False, regex=True)
                 ].copy()
                 
+                # Early exit if no data
                 if df_crop.empty:
                     st.error(f"No data found for {crop} in Mato Grosso. Please check the crop data file.")
                     st.stop()
@@ -673,7 +707,14 @@ with farmer_tab:
                 with st.expander("Error Details", expanded=False):
                     st.code(traceback.format_exc())
 
-        st.download_button("Download Full Results (CSV)", df.to_csv(index=False).encode(), f"biochar_results_{pd.Timestamp.now():%Y%m%d_%H%M}.csv", "text/csv", width='stretch')
+        if csv_path and df is not None:
+            # Cache CSV encoding to avoid recomputation on every rerun
+            @st.cache_data(show_spinner=False)
+            def get_csv_data(df):
+                return df.to_csv(index=False).encode()
+            
+            csv_data = get_csv_data(df)
+            st.download_button("Download Full Results (CSV)", csv_data, f"biochar_results_{pd.Timestamp.now():%Y%m%d_%H%M}.csv", "text/csv", width='stretch')
     else:
         st.info("Run the analysis to view results.")
 
@@ -708,7 +749,7 @@ with investor_tab:
                 st.code(str(e))
                 st.stop()
 
-            @st.cache_data(show_spinner="Loading crop residue data (first time only)...")
+            @st.cache_data(show_spinner=False)
             def get_gdf():
                 return prepare_investor_crop_area_geodata(
                     boundaries_dir,
@@ -716,7 +757,8 @@ with investor_tab:
                     simplify_tolerance=0.05
                 )
 
-            gdf = get_gdf()
+            with st.spinner("Loading crop residue data (first time only)..."):
+                gdf = get_gdf()
 
             # Use a unique, stable key to prevent tab resets when radio button changes
             data_type_radio = st.radio(
