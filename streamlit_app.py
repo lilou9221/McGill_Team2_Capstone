@@ -209,14 +209,17 @@ st.markdown("""
     .gradient-label {flex: 1; text-align: center;}
     .footer {text-align: center; padding: 6rem 0 3rem; color: #666; border-top: 1px solid #eee; margin-top: 8rem; font-size: 0.95rem;}
     /* Fix dropdown menu text visibility - dark background with white text */
+    /* Closed dropdown - selected value */
+    [data-baseweb="select"] {background-color: #1a1a1a !important;}
+    [data-baseweb="select"] * {color: #fff !important;}
+    [data-baseweb="select"] span {color: #fff !important;}
+    [data-baseweb="select"] div {color: #fff !important;}
+    /* Open dropdown - menu items */
     [data-baseweb="popover"] [data-baseweb="menu"] {background-color: #1a1a1a !important;}
     [data-baseweb="popover"] li {color: #fff !important; background-color: #1a1a1a !important;}
     [data-baseweb="popover"] li span {color: #fff !important;}
     [data-baseweb="popover"] li div {color: #fff !important;}
     [data-baseweb="popover"] li:hover {background-color: #333 !important;}
-    [data-baseweb="menu"] li {color: #fff !important;}
-    [data-baseweb="menu"] li span {color: #fff !important;}
-    [data-baseweb="menu"] li div {color: #fff !important;}
     div[data-baseweb="popover"] * {color: #fff !important;}
 </style>
 """, unsafe_allow_html=True)
