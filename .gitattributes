@@ -1,8 +1,29 @@
-# Boundary shapefiles and raster data are stored externally (Google Drive)
-# Keep them as normal Git files (no LFS filters)
-data/boundaries/BR_Municipios_2024/* -filter -diff -merge -text
-data/raw/* -filter -diff -merge -text
+# =============================================================================
+# Git Attributes - Biochar Suitability Mapper
+# =============================================================================
 
-# CSVs should not be LFS
-data/pyrolysis/pyrolysis_data.csv -filter -diff -merge text
-data/pyrolysis/pyrolysis_data_fallback.csv -filter -diff -merge text
+# Binary files - mark as binary to prevent diff/merge issues
+*.tif binary
+*.shp binary
+*.dbf binary
+*.shx binary
+
+# Text files - ensure consistent line endings
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.html text eol=lf
+
+# Pyrolysis data (text CSV files)
+data/pyrolysis/*.csv text eol=lf
+
+# Shapefile auxiliary files (text)
+*.prj text eol=lf
+*.cpg text eol=lf
+
+# Prevent GitHub linguist from misclassifying
+*.html linguist-detectable=false
