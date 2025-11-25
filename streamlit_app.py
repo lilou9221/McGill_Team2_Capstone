@@ -392,9 +392,9 @@ with farmer_tab:
         # === YOUR ORIGINAL MAPS & RECOMMENDATIONS (UNCHANGED) ===
         st.markdown("### Soil Health & Biochar Suitability Insights (Mato Grosso State)")
         
-        # Cache expensive calculations to avoid recomputing on every rerun
         @st.cache_data(show_spinner=False)
-        def calculate_metrics(df):
+        def calculate_metrics(df) -> dict:
+            """Calculate summary metrics from suitability scores DataFrame."""
             metrics = {"count": len(df)}
             if "suitability_score" in df.columns:
                 metrics["mean_score"] = float(df["suitability_score"].mean())
@@ -568,7 +568,8 @@ with farmer_tab:
                     
                     # Show top 10 by suitability score (cached calculation)
                     @st.cache_data(show_spinner=False)
-                    def get_top10_recommendations(rec_df):
+                    def get_top10_recommendations(rec_df) -> pd.DataFrame:
+                        """Get top 10 locations by suitability score with recommendations."""
                         display_cols = ["suitability_score", "suitability_grade", "Recommended_Feedstock", "Recommendation_Reason"]
                         if "Data_Source" in rec_df.columns and "Data_Quality" in rec_df.columns:
                             display_cols.extend(["Data_Source", "Data_Quality"])
@@ -620,11 +621,13 @@ with farmer_tab:
 
         # Cache data loading functions (moved outside to avoid redefinition on reruns)
         @st.cache_data(ttl=3600, show_spinner=False)
-        def load_ratios():
+        def load_ratios() -> pd.DataFrame:
+            """Load crop residue ratios from CSV."""
             return pd.read_csv(PROJECT_ROOT / "data" / "residue_ratios.csv")
 
         @st.cache_data(ttl=3600, show_spinner=False)
-        def load_harvest_data():
+        def load_harvest_data() -> pd.DataFrame:
+            """Load Brazil crop harvest data (2017-2024)."""
             return pd.read_csv(PROJECT_ROOT / "data" / "brazil_crop_harvest_area_2017-2024.csv")
         
         # Mapping: English crop name -> (Portuguese name in harvest file, English name in ratios file)
@@ -732,9 +735,9 @@ with farmer_tab:
                     st.code(traceback.format_exc())
 
         if csv_path and df is not None:
-            # Cache CSV encoding to avoid recomputation on every rerun
             @st.cache_data(show_spinner=False)
-            def get_csv_data(df):
+            def get_csv_data(df) -> bytes:
+                """Encode DataFrame as CSV bytes for download."""
                 return df.to_csv(index=False).encode()
             
             csv_data = get_csv_data(df)
@@ -753,8 +756,8 @@ with investor_tab:
     boundaries_dir = PROJECT_ROOT / "data"
     crop_data_csv = PROJECT_ROOT / "data" / "Updated_municipality_crop_production_data.csv"
 
-    # Check file existence (no cache - cheap operation, needs to be accurate after downloads)
-    def check_investor_data_exists():
+    def check_investor_data_exists() -> tuple[bool, bool, bool]:
+        """Check if investor map data files exist. Returns (all_exist, shp_exists, csv_exists)."""
         shp_file = boundaries_dir / "BR_Municipios_2024_simplified.shp"
         shp_exists = shp_file.exists()
         csv_exists = crop_data_csv.exists()
@@ -773,11 +776,12 @@ with investor_tab:
         if data_available:
             @st.cache_data(show_spinner=False)
             def get_gdf():
-                    return prepare_investor_crop_area_geodata(
-                        boundaries_dir,
-                        crop_data_csv,
-                        simplify_tolerance=0.05
-                    )
+                """Load and prepare municipality crop data GeoDataFrame."""
+                return prepare_investor_crop_area_geodata(
+                    boundaries_dir,
+                    crop_data_csv,
+                    simplify_tolerance=0.05
+                )
 
             with st.spinner("Loading crop residue data (first time only)..."):
                 gdf = get_gdf()
