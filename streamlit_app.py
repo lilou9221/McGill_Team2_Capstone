@@ -315,9 +315,15 @@ def load_html_map(p):
     return path.read_text(encoding="utf-8") if path.exists() else None
 
 if st.session_state.get("analysis_results"):
-    csv_path = Path(st.session_state.analysis_results["csv_path"])
-    df = load_results_csv(str(csv_path))
-    map_paths = st.session_state.analysis_results["map_paths"]
+    analysis_results = st.session_state.analysis_results
+    if "csv_path" in analysis_results and "map_paths" in analysis_results:
+        csv_path = Path(analysis_results["csv_path"])
+        df = load_results_csv(str(csv_path))
+        map_paths = analysis_results["map_paths"]
+    else:
+        # Invalid analysis_results structure, reset it
+        st.session_state.analysis_results = None
+        csv_path = df = map_paths = None
 elif not st.session_state.get("analysis_running") and not st.session_state.get("existing_results_checked", False):
     potential_csv = PROJECT_ROOT / config["data"]["processed"] / "suitability_scores.csv"
     if potential_csv.exists() and Path(PROJECT_ROOT / config["output"]["html"] / "suitability_map.html").exists():
@@ -335,7 +341,9 @@ elif not st.session_state.get("analysis_running") and not st.session_state.get("
         map_paths = st.session_state.analysis_results["map_paths"]
     st.session_state["existing_results_checked"] = True
 
-    farmer_tab, investor_tab = st.tabs(["Farmer Perspective", "Investor Perspective"])
+# Create tabs - Streamlit maintains tab state automatically
+# Tabs are always created to prevent tab resets on reruns
+farmer_tab, investor_tab = st.tabs(["Farmer Perspective", "Investor Perspective"])
 
 # ========================================================
 # FARMER TAB – YOUR ORIGINAL + YOUR REQUESTED SOURCING TOOL
@@ -348,12 +356,18 @@ with farmer_tab:
         with col1:
             st.markdown(f'<div class="metric-card"><h4>Hexagons Analyzed</h4><p>{len(df):,}</p></div>', unsafe_allow_html=True)
         with col2:
-            mean_score = df["suitability_score"].mean()
-            st.markdown(f'<div class="metric-card"><h4>Mean Suitability Score</h4><p>{mean_score:.2f}</p></div>', unsafe_allow_html=True)
+            if "suitability_score" in df.columns:
+                mean_score = df["suitability_score"].mean()
+                st.markdown(f'<div class="metric-card"><h4>Mean Suitability Score</h4><p>{mean_score:.2f}</p></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="metric-card"><h4>Mean Suitability Score</h4><p>N/A</p></div>', unsafe_allow_html=True)
         with col3:
-            high = (df["suitability_score"] >= 7.0).sum()
-            pct = high / len(df) * 100
-            st.markdown(f'<div class="metric-card"><h4>High Suitability (≥7.0)</h4><p>{high:,}<br><small>({pct:.1f}%)</small></p></div>', unsafe_allow_html=True)
+            if "suitability_score" in df.columns:
+                high = (df["suitability_score"] >= 7.0).sum()
+                pct = high / len(df) * 100
+                st.markdown(f'<div class="metric-card"><h4>High Suitability (≥7.0)</h4><p>{high:,}<br><small>({pct:.1f}%)</small></p></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="metric-card"><h4>High Suitability (≥7.0)</h4><p>N/A</p></div>', unsafe_allow_html=True)
 
         tab1, tab2, tab3, tab4, rec_tab = st.tabs(["Biochar Suitability", "Soil Organic Carbon", "Soil pH", "Soil Moisture", "Top 10 Recommendations"])
 
@@ -367,7 +381,10 @@ with farmer_tab:
 
         with tab1:
             st.subheader("Biochar Application Suitability")
-            load_map(map_paths["suitability"])
+            if map_paths and "suitability" in map_paths:
+                load_map(map_paths["suitability"])
+            else:
+                st.warning("Suitability map not available.")
             st.markdown("""
                 <div class="legend-box">
                     <div class="legend-title">Suitability Score</div>
@@ -390,7 +407,10 @@ with farmer_tab:
 
         with tab2:
             st.subheader("Soil Organic Carbon (g/kg) - Mato Grosso State")
-            load_map(map_paths["soc"])
+            if map_paths and "soc" in map_paths:
+                load_map(map_paths["soc"])
+            else:
+                st.warning("Soil Organic Carbon map not available.")
             st.markdown("""
                 <div class="legend-box">
                     <div class="legend-title">Soil Organic Carbon (Mato Grosso State)</div>
@@ -416,7 +436,10 @@ with farmer_tab:
 
         with tab3:
             st.subheader("Soil pH - Mato Grosso State")
-            load_map(map_paths["ph"])
+            if map_paths and "ph" in map_paths:
+                load_map(map_paths["ph"])
+            else:
+                st.warning("Soil pH map not available.")
             st.markdown("""
                 <div class="legend-box">
                     <div class="legend-title">Soil pH (Mato Grosso State)</div>
@@ -441,7 +464,10 @@ with farmer_tab:
 
         with tab4:
             st.subheader("Soil Moisture (%) - Mato Grosso State")
-            load_map(map_paths["moisture"])
+            if map_paths and "moisture" in map_paths:
+                load_map(map_paths["moisture"])
+            else:
+                st.warning("Soil Moisture map not available.")
             st.markdown("""
                 <div class="legend-box">
                     <div class="legend-title">Volumetric Soil Moisture (Mato Grosso State)</div>
@@ -495,7 +521,12 @@ with farmer_tab:
                         display_cols.extend(["lat", "lon"])
                     
                     display_cols = [c for c in display_cols if c in rec_df.columns]
-                    top10 = rec_df[display_cols].sort_values("suitability_score", ascending=False).head(10)
+                    if "suitability_score" in display_cols:
+                        top10 = rec_df[display_cols].sort_values("suitability_score", ascending=False).head(10)
+                    elif display_cols:
+                        top10 = rec_df[display_cols].head(10)
+                    else:
+                        top10 = rec_df.head(10)
                     
                     # Format the dataframe for display
                     top10_display = top10.copy()
@@ -606,13 +637,18 @@ with farmer_tab:
                 st.success(f"{latest_year} • {len(df_crop)} municipalities • Total biochar: {total_biochar:,.0f} tons • Total residue: {total_residue:,.0f} tons")
 
                 # Display top municipalities
-                display = df_crop[["Municipality", "Harvested_area_ha", "Biochar_t_per_ha", "Biochar_t_total"]].head(50)
-                display = display.rename(columns={
-                    "Harvested_area_ha": "Area (ha)",
-                    "Biochar_t_per_ha": "Biochar (t/ha)",
-                    "Biochar_t_total": "Total Biochar (tons)"
-                })
-                st.dataframe(display, use_container_width=True)
+                display_cols = ["Municipality", "Harvested_area_ha", "Biochar_t_per_ha", "Biochar_t_total"]
+                display_cols = [c for c in display_cols if c in df_crop.columns]
+                if display_cols:
+                    display = df_crop[display_cols].head(50)
+                    display = display.rename(columns={
+                        "Harvested_area_ha": "Area (ha)",
+                        "Biochar_t_per_ha": "Biochar (t/ha)",
+                        "Biochar_t_total": "Total Biochar (tons)"
+                    })
+                    st.dataframe(display, use_container_width=True)
+                else:
+                    st.warning("Required columns not found in crop data.")
                 
                 # Show summary info
                 with st.expander("Calculation Details", expanded=False):
@@ -725,11 +761,20 @@ with investor_tab:
 
             c1, c2, c3 = st.columns(3)
             with c1: 
-                st.metric("Total Crop Area", f"{gdf['total_crop_area_ha'].sum():,.0f} ha")
+                if 'total_crop_area_ha' in gdf.columns:
+                    st.metric("Total Crop Area", f"{gdf['total_crop_area_ha'].sum():,.0f} ha")
+                else:
+                    st.metric("Total Crop Area", "N/A")
             with c2: 
-                st.metric("Total Production", f"{gdf['total_crop_production_ton'].sum():,.0f} t")
+                if 'total_crop_production_ton' in gdf.columns:
+                    st.metric("Total Production", f"{gdf['total_crop_production_ton'].sum():,.0f} t")
+                else:
+                    st.metric("Total Production", "N/A")
             with c3: 
-                st.metric("Total Residue", f"{gdf['total_crop_residue_ton'].sum():,.0f} t")
+                if 'total_crop_residue_ton' in gdf.columns:
+                    st.metric("Total Residue", f"{gdf['total_crop_residue_ton'].sum():,.0f} t")
+                else:
+                    st.metric("Total Residue", "N/A")
 
 # ============================================================
 # FOOTER (YOUR ORIGINAL)
