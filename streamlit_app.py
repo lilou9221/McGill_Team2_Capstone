@@ -785,7 +785,9 @@ with investor_tab:
                 missing.append("Updated_municipality_crop_production_data.csv")
             st.info(f"Investor map data not available. Missing: {', '.join(missing)}")
     except Exception as e:
+        import traceback
         st.error(f"Failed to load investor map: {str(e)}")
+        st.code(traceback.format_exc(), language="text")
 
 # ============================================================
 # FOOTER (YOUR ORIGINAL)
